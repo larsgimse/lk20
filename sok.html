@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LK20 Læreplansøk via Grep API</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #1e293b; }
+    .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+    input, select { width: 100%; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 1rem; }
+    .result-item { background: white; border-left: 4px solid #0284c7; padding: 1rem; margin-bottom: 0.75rem; border-radius: 0 6px 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .result-type { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #0284c7; margin-bottom: 0.25rem; }
+    mark { background-color: #fef08a; padding: 0 2px; border-radius: 2px; }
+    .status { font-size: 0.9rem; color: #64748b; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <h1>Søk i LK20 Læreplaner</h1>
+
+  <div class="card">
+    <!-- 1. Fagvelger -->
+    <label for="fagInput">1. Velg fag (skriv for å søke i Grep-kodeverk):</label>
+    <input type="text" id="fagInput" list="fagListe" placeholder="Eks: Matematikk, Norsk, Kunst og håndverk...">
+    <datalist id="fagListe"></datalist>
+
+    <div id="fagStatus" class="status">Laster fagkodeverk fra Grep...</div>
+
+    <hr style="margin: 1.5rem 0; border: 0; border-top: 1px solid #e2e8f0;">
+
+    <!-- 2. Stikkordsøk -->
+    <label for="stikkordInput">2. Skriv inn stikkord (separer med komma eller mellomrom):</label>
+    <input type="text" id="stikkordInput" placeholder="Eks: algoritmisk tenkning, geometri" disabled>
+  </div>
+
+  <div id="treffTittel" style="font-weight: 600; margin-bottom: 1rem;"></div>
+  <div id="resultater"></div>
+
+  <script>
+    const API_BASE = "https://data.udir.no/kl06/v201906";
+    let alleFag = [];
+    let aktivLaereplanData = null;
+
+    // Last inn fag fra Grep ved oppstart
+    async function lastFag() {
+      try {
+        const response = await fetch(`${API_BASE}/laereplaner`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+        
+        alleFag = data;
+        const datalist = document.getElementById('fagListe');
+        
+        // Fyll opp <datalist> med fagnavn og kode
+        data.forEach(lp => {
+          const option = document.createElement('option');
+          // Vis tittel og kode i datalisten
+          const tittel = lp.tittel ? (lp.tittel.nob || lp.tittel.default) : "Uten tittel";
+          option.value = `${tittel} (${lp.kode})`;
+          datalist.appendChild(option);
+        });
+
+        document.getElementById('fagStatus').textContent = `${data.length} læreplaner lastet fra Grep.`;
+      } catch (err) {
+        document.getElementById('fagStatus').textContent = "Feil ved lasting av fagkodeverk.";
+        console.error(err);
+      }
+    }
+
+    // Når brukeren velger et fag
+    document.getElementById('fagInput').addEventListener('input', async (e) => {
+      const val = e.target.value;
+      // Sjekk om verdien matcher formatet "Tittel (KODE)"
+      const match = val.match(/\(([A-Z0-9-]+)\)$/);
+
+      if (match) {
+        const kode = match[1];
+        document.getElementById('fagStatus').textContent = `Henter læreplan for ${kode}...`;
+        
+        try {
+          const response = await fetch(`${API_BASE}/laereplaner/${kode}`, {
+            headers: { 'Accept': 'application/json' }
+          });
+          aktivLaereplanData = await response.json();
+          
+          document.getElementById('fagStatus').textContent = `Læreplan for ${kode} er klar. Du kan nå søke i stikkord.`;
+          document.getElementById('stikkordInput').disabled = false;
+          utforsok(); // Kjør søk om det allerede står stikkord der
+        } catch (err) {
+          document.getElementById('fagStatus').textContent = "Kunne ikke hente detaljer for læreplanen.";
+        }
+      }
+    });
+
+    // Søkefunksjon for stikkord
+    document.getElementById('stikkordInput').addEventListener('input', utforsok);
+
+    function utforsok() {
+      if (!aktivLaereplanData) return;
+
+      const rawInput = document.getElementById('stikkordInput').value;
+      const søkeord = rawInput.toLowerCase().split(/[\s,]+/).filter(w => w.length > 1);
+      const container = document.getElementById('resultater');
+      container.innerHTML = '';
+
+      if (søkeord.length === 0) {
+        document.getElementById('treffTittel').textContent = '';
+        return;
+      }
+
+      let treff = [];
+
+      // 1. Søk i kompetansemål
+      if (aktivLaereplanData.kompetansemaal) {
+        aktivLaereplanData.kompetansemaal.forEach(km => {
+          const tekst = km.tittel ? (km.tittel.nob || km.tittel.default) : "";
+          if (søkerTekstMatch(tekst, søkeord)) {
+            treff.push({ type: 'Kompetansemål', tekst: tekst });
+          }
+        });
+      }
+
+      // 2. Søk i kjerneelementer
+      if (aktivLaereplanData.kjerneelementer) {
+        aktivLaereplanData.kjerneelementer.forEach(ke => {
+          const tittel = ke.tittel ? (ke.tittel.nob || ke.tittel.default) : "";
+          const ingress = ke.tekst ? (ke.tekst.nob || ke.tekst.default) : "";
+          const fullTekst = `${tittel}: ${ingress}`;
+          
+          if (søkerTekstMatch(fullTekst, søkeord)) {
+            treff.push({ type: 'Kjerneelement', tekst: fullTekst });
+          }
+        });
+      }
+
+      // Vis resultater
+      document.getElementById('treffTittel').textContent = `Funnet ${treff.length} treff for "${rawInput}":`;
+
+      treff.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        div.innerHTML = `
+          <div class="result-type">${item.type}</div>
+          <div>${fremhevSokeord(item.tekst, søkeord)}</div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Sjekker om teksten inneholder minst ett av søkeordene
+    function søkerTekstMatch(tekst, ordListe) {
+      const t = tekst.toLowerCase();
+      return ordListe.some(ord => t.includes(ord));
+    }
+
+    // Markerer søkeordene i teksten med <mark>
+    function fremhevSokeord(tekst, ordListe) {
+      let regExp = new RegExp(`(${ordListe.join('|')})`, 'gi');
+      return tekst.replace(regExp, '<mark>$1</mark>');
+    }
+
+    // Start ved å laste fagkoder
+    lastFag();
+  </script>
+</body>
+</html>
