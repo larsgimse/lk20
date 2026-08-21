@@ -3,19 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LK20 Stikkordsøk i Læreplan</title>
+  <title>LK20 Stikkordsøk</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #f1f5f9; }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #f8fafc; }
     .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     label { display: block; font-weight: 600; margin-bottom: 0.4rem; }
     input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 1rem; }
-    input:disabled { background: #f8fafc; cursor: not-allowed; }
+    input:disabled { background: #f1f5f9; cursor: not-allowed; }
     
-    .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .result-tag { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+    .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .result-tag { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.25rem; }
     .result-text { font-size: 0.95rem; line-height: 1.5; color: #334155; }
     mark { background: #fef08a; padding: 0 2px; border-radius: 2px; font-weight: 600; }
-    .status { font-size: 0.875rem; color: #64748b; font-style: italic; }
+    .status { font-size: 0.875rem; color: #0284c7; font-weight: 500; }
+    .error { color: #dc2626; }
   </style>
 </head>
 <body>
@@ -24,14 +25,14 @@
 
   <div class="card">
     <label for="fagInput">1. Velg fag:</label>
-    <input type="text" id="fagInput" list="fagListe" placeholder="Søk og velg fag (f.eks. Norsk, Matematikk)...">
+    <input type="text" id="fagInput" list="fagListe" placeholder="Skriv for å søke fag (f.eks. Norsk, Kunst)...">
     <datalist id="fagListe"></datalist>
     <div id="fagStatus" class="status">Laster fagliste fra Grep API...</div>
 
     <hr style="margin: 1.25rem 0; border: 0; border-top: 1px solid #e2e8f0;">
 
-    <label for="stikkordInput">2. Søk etter stikkord i læreplanen:</label>
-    <input type="text" id="stikkordInput" placeholder="Skriv inn søkeord (f.eks. algoritmisk, demokrati, kildekritikk)..." disabled>
+    <label for="stikkordInput">2. Søk etter stikkord:</label>
+    <input type="text" id="stikkordInput" placeholder="Skriv inn søkeord..." disabled>
   </div>
 
   <div id="treffTittel" style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.75rem;"></div>
@@ -41,23 +42,36 @@
     const API_BASE = "https://data.udir.no/kl06/v201906";
     let aktivLaereplan = null;
 
-    // 1. Hent alle læreplaner til autokomplettering
+    // Hjelpefunksjon: Henter ut ren tekst uansett om Udir sender streng, bokmål (nob), nynorsk (nno) eller samisk
+    function hentTekst(obj) {
+      if (!obj) return "";
+      if (typeof obj === "string") return obj;
+      if (typeof obj === "object") {
+        return obj.nob || obj.nno || obj.default || obj.se || Object.values(obj).find(v => typeof v === "string") || "";
+      }
+      return "";
+    }
+
+    // 1. Last fagliste
     async function initFagliste() {
       try {
         const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP feil: ${res.status}`);
         const data = await res.json();
         
         const datalist = document.getElementById('fagListe');
         data.forEach(lp => {
-          const tittel = lp.tittel ? (lp.tittel.nob || lp.tittel.default) : "Uten tittel";
+          const tittel = hentTekst(lp.tittel) || lp.kode;
           const opt = document.createElement('option');
           opt.value = `${tittel} (${lp.kode})`;
           datalist.appendChild(opt);
         });
 
-        document.getElementById('fagStatus').textContent = `Klar. Hentet ${data.length} læreplaner.`;
+        document.getElementById('fagStatus').textContent = `Klar! Lastet ${data.length} læreplaner.`;
       } catch (e) {
-        document.getElementById('fagStatus').textContent = "Feil ved tilkobling til Grep API.";
+        document.getElementById('fagStatus').className = "status error";
+        document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir. Sjekk internettilkoblingen.";
+        console.error(e);
       }
     }
 
@@ -66,79 +80,85 @@
       const match = e.target.value.match(/\(([A-Z0-9-]+)\)$/);
       if (match) {
         const kode = match[1];
+        document.getElementById('fagStatus').className = "status";
         document.getElementById('fagStatus').textContent = `Henter full læreplan for ${kode}...`;
         
         try {
           const res = await fetch(`${API_BASE}/laereplaner/${kode}`, { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error(`Kunne ikke hente ${kode}`);
+          
           aktivLaereplan = await res.json();
           
-          document.getElementById('fagStatus').textContent = `Læreplan for ${kode} er lastet inn! Klart for søk.`;
+          document.getElementById('fagStatus').textContent = `Læreplan (${kode}) er lastet inn! Du kan nå søke i feltet under.`;
           document.getElementById('stikkordInput').disabled = false;
           document.getElementById('stikkordInput').focus();
           kjoerSoek();
         } catch (e) {
-          document.getElementById('fagStatus').textContent = "Kunne ikke laste ned læreplanen.";
+          document.getElementById('fagStatus').className = "status error";
+          document.getElementById('fagStatus').textContent = "Kunne ikke hente læreplanen fra Udir.";
+          console.error(e);
         }
       }
     });
 
-    // 3. Søk direkte ved tastaturytelse
+    // 3. Søk i alt innhold
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
     function kjoerSoek() {
       if (!aktivLaereplan) return;
 
-      const soketekst = document.getElementById('stikkordInput').value.trim();
+      const søketekst = document.getElementById('stikkordInput').value.trim();
       const container = document.getElementById('resultatVisning');
       container.innerHTML = '';
 
-      if (soketekst.length < 2) {
+      if (søketekst.length < 2) {
         document.getElementById('treffTittel').textContent = '';
         return;
       }
 
-      const ordListe = soketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 1);
+      const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
       const treff = [];
 
-      // Sjekk hjelpefunksjon
-      const sjekkOgLeggTil = (tekst, seksjon) => {
-        if (!tekst) return;
-        const t = tekst.toLowerCase();
-        if (ordListe.some(o => t.includes(o))) {
-          treff.push({ seksjon: seksjon, tekst: tekst });
-        }
-      };
+      // Dyp-søk funksjon som går gjennom arrayer av elementer i læreplanen
+      function soekIEnhet(elementer, seksjonsNavn) {
+        if (!Array.isArray(elementer)) return;
 
-      // Søk gjennom kompetansemål
-      if (aktivLaereplan.kompetansemaal) {
-        aktivLaereplan.kompetansemaal.forEach(km => {
-          sjekkOgLeggTil(km.tittel?.nob || km.tittel?.default, "Kompetansemål");
+        elementer.forEach(el => {
+          // Hent ut alt av tekst fra elementet (tittel, beskrivelse, tekst osv.)
+          let samletTekst = "";
+          if (el.tittel) samletTekst += hentTekst(el.tittel) + " ";
+          if (el.tekst) samletTekst += hentTekst(el.tekst) + " ";
+          if (el.beskrivelse) samletTekst += hentTekst(el.beskrivelse) + " ";
+          
+          samletTekst = samletTekst.trim();
+
+          if (samletTekst) {
+            const t = samletTekst.toLowerCase();
+            // Sjekk om ALLE eller MINST ETT ord treffer (her sjekker vi om minst ett ord treffer)
+            if (ordListe.some(ord => t.includes(ord))) {
+              treff.push({ seksjon: seksjonsNavn, tekst: samletTekst });
+            }
+          }
         });
       }
 
-      // Søk gjennom kjerneelementer
-      if (aktivLaereplan.kjerneelementer) {
-        aktivLaereplan.kjerneelementer.forEach(ke => {
-          const tittel = ke.tittel?.nob || ke.tittel?.default || "";
-          const tekst = ke.tekst?.nob || ke.tekst?.default || "";
-          sjekkOgLeggTil(`${tittel}: ${tekst}`, "Kjerneelement");
-        });
+      // Søk i alle relevante deler av læreplanstrukturen
+      soekIEnhet(aktivLaereplan.kompetansemaal, "Kompetansemål");
+      soekIEnhet(aktivLaereplan.kjerneelementer, "Kjerneelement");
+      soekIEnhet(aktivLaereplan.tverrfagligeTemaer, "Tverrfaglig tema");
+      soekIEnhet(aktivLaereplan.grunnleggendeFerdigheter, "Grunnleggende ferdighet");
+
+      // Vis treff
+      document.getElementById('treffTittel').textContent = `${treff.length} treff for "${søketekst}"`;
+
+      if (treff.length === 0) {
+        container.innerHTML = `<div style="color: #64748b; font-style: italic;">Ingen treff på "${søketekst}" i denne læreplanen. Prøv et annet ord eller sjekk at faget er rigtig valgt.</div>`;
+        return;
       }
 
-      // Søk gjennom tverrfaglige temaer
-      if (aktivLaereplan.tverrfagligeTemaer) {
-        aktivLaereplan.tverrfagligeTemaer.forEach(tt => {
-          const tittel = tt.tittel?.nob || tt.tittel?.default || "";
-          const tekst = tt.tekst?.nob || tt.tekst?.default || "";
-          sjekkOgLeggTil(`${tittel}: ${tekst}`, "Tverrfaglig Tema");
-        });
-      }
+      // Bygg regExp for å utheve ord
+      const regExp = new RegExp(`(${ordListe.map(o => o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
 
-      // Oppdater overskrift
-      document.getElementById('treffTittel').textContent = `${treff.length} treff for "${soketekst}"`;
-
-      // Render treff på siden
-      const regExp = new RegExp(`(${ordListe.join('|')})`, 'gi');
       treff.forEach(item => {
         const framhevetTekst = item.tekst.replace(regExp, '<mark>$1</mark>');
         
