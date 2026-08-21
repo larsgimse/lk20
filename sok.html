@@ -12,14 +12,14 @@
     .search-box { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
     .search-box:disabled { background: #f1f5f9; cursor: not-allowed; }
     
-    .checkbox-container { max-height: 200px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; }
+    .checkbox-container { max-height: 220px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; }
     .checkbox-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
     .checkbox-item:hover { background-color: #f1f5f9; }
     .checkbox-item input { cursor: pointer; }
 
     .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
     .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .result-tag { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .result-tag { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
     .fag-badge { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; text-transform: none; font-weight: 600; }
     .result-text { font-size: 0.95rem; line-height: 1.5; color: #334155; }
     mark { background: #fef08a; padding: 0 2px; border-radius: 2px; font-weight: 600; }
@@ -59,7 +59,7 @@
     <hr style="margin: 1.25rem 0; border: 0; border-top: 1px solid #e2e8f0;">
 
     <label for="stikkordInput">2. Søk etter stikkord:</label>
-    <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn søkeord..." disabled>
+    <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn søkeord (f.eks. digital, kildekritikk)..." disabled>
   </div>
 
   <div class="result-header">
@@ -82,22 +82,40 @@
       if (!obj) return "";
       if (typeof obj === "string") return obj;
       if (typeof obj === "object") {
-        return obj.nob || obj.nno || obj.se || Object.values(obj).find(v => typeof v === "string") || "";
+        return obj.nob || obj.nno || obj.se || obj.tittel || Object.values(obj).find(v => typeof v === "string") || "";
       }
       return "";
     }
 
-    // 1. Last inn alle fag og generer sjekkbokser
+    // 1. Last inn alle fag og ekstraher fulle fagnavn
     async function initFagliste() {
       try {
         const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) throw new Error(`HTTP feil: ${res.status}`);
         const data = await res.json();
         
-        alleFagListe = data.map(lp => ({
-          kode: lp.kode,
-          navn: hentTekst(lp.tittel) || lp.kode
-        })).sort((a, b) => a.navn.localeCompare(b.navn, 'no'));
+        alleFagListe = data.map(lp => {
+          let navn = "";
+
+          // Sjekk flere mulige nøkler for tittel/navn i API-responsen
+          if (lp.tittel) navn = hentTekst(lp.tittel);
+          if (!navn && lp.navn) navn = hentTekst(lp.navn);
+          if (!navn && lp.overskrift) navn = hentTekst(lp.overskrift);
+
+          // Hvis navnet fortsatt matcher koden eller mangler
+          if (!navn || navn === lp.kode) {
+            if (typeof lp.tittel === 'object') {
+              navn = lp.tittel.nob || lp.tittel.nno || lp.tittel.se || lp.kode;
+            } else {
+              navn = lp.kode;
+            }
+          }
+
+          return {
+            kode: lp.kode,
+            navn: navn
+          };
+        }).sort((a, b) => a.navn.localeCompare(b.navn, 'no'));
 
         tegnFagliste(alleFagListe);
         document.getElementById('fagStatus').textContent = `Klar! Lastet ${alleFagListe.length} læreplaner. Velg fag ovenfor.`;
@@ -158,7 +176,6 @@
 
       kombinertLaereplanData = [];
       
-      // Hent alle valgte læreplaner i parallell
       for (const kode of valgteKoder) {
         const fagObj = alleFagListe.find(f => f.kode === kode);
         try {
@@ -194,6 +211,7 @@
       }
 
       if (typeof obj === 'object') {
+        // Spesifikk håndtering for kompetansemål og trinn
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
             const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "";
