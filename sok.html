@@ -13,7 +13,7 @@
     
     .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
     .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .result-tag { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.25rem; }
+    .result-tag { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.25rem; }
     .result-text { font-size: 0.95rem; line-height: 1.5; color: #334155; }
     mark { background: #fef08a; padding: 0 2px; border-radius: 2px; font-weight: 600; }
     .status { font-size: 0.875rem; color: #0284c7; font-weight: 500; }
@@ -76,7 +76,6 @@
       return "";
     }
 
-    // 1. Last inn alle læreplaner
     async function initFagliste() {
       try {
         const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
@@ -101,7 +100,6 @@
       }
     }
 
-    // 2. Velg fag og hent alt innhold dypt
     document.getElementById('fagInput').addEventListener('change', async (e) => {
       const val = e.target.value;
       const match = val.match(/\(([A-Z0-9-]+)\)$/);
@@ -120,7 +118,6 @@
           const rawData = await res.json();
           aktivLaereplanData = [];
           
-          // Dyp utpakking av alle tekstforekomster
           lesObjekt(rawData, "Generelt");
           
           document.getElementById('fagStatus').textContent = `Læreplan for ${aktivtFagNavn} er klar! Skriv inn stikkord under.`;
@@ -135,7 +132,6 @@
       }
     });
 
-    // Hjelpefunksjon for å hente ut alt av tekstnoder uansett struktur
     function lesObjekt(obj, naavaerendeSeksjon) {
       if (!obj) return;
 
@@ -152,6 +148,23 @@
       }
 
       if (typeof obj === 'object') {
+        // Håndter kompetansemaalsett særskilt for å ta vare på trinntittel
+        if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
+          obj.kompetansemaalsett.forEach(sett => {
+            const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "";
+            const seksjonNavn = trinnTittel ? `Kompetansemål – ${trinnTittel}` : "Kompetansemål";
+            
+            if (Array.isArray(sett.kompetansemaal)) {
+              sett.kompetansemaal.forEach(km => {
+                const kmTekst = hentTekst(km.tittel) || hentTekst(km.tekst) || hentTekst(km.beskrivelse);
+                if (kmTekst) {
+                  aktivLaereplanData.push({ seksjon: seksjonNavn, tekst: kmTekst.trim() });
+                }
+              });
+            }
+          });
+        }
+
         const t = hentTekst(obj);
         if (t && (obj.nob || obj.nno || obj.se)) {
           aktivLaereplanData.push({ seksjon: naavaerendeSeksjon, tekst: t.trim() });
@@ -159,9 +172,11 @@
         }
 
         for (const [key, val] of Object.entries(obj)) {
+          // Hopp over kompetansemaalsett her siden vi allerede behandlet det spesifikt over
+          if (key === 'kompetansemaalsett') continue;
+
           let nySeksjon = naavaerendeSeksjon;
-          if (key.includes('kompetansemaal')) nySeksjon = 'Kompetansemål';
-          else if (key.includes('kjerneelementer')) nySeksjon = 'Kjerneelement';
+          if (key.includes('kjerneelementer')) nySeksjon = 'Kjerneelement';
           else if (key.includes('tverrfagligeTemaer')) nySeksjon = 'Tverrfaglig tema';
           else if (key.includes('grunnleggendeFerdigheter')) nySeksjon = 'Grunnleggende ferdighet';
           else if (key.includes('omFaget') || key.includes('fagrelevans')) nySeksjon = 'Om faget';
@@ -172,7 +187,6 @@
       }
     }
 
-    // 3. Søk i utpakket data
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
     function kjoerSoek() {
@@ -194,8 +208,9 @@
       aktivLaereplanData.forEach(item => {
         const t = item.tekst.toLowerCase();
         if (ordListe.some(ord => t.includes(ord))) {
-          if (!unikeTekster.has(item.tekst)) {
-            unikeTekster.add(item.tekst);
+          const unikNøkkel = `${item.seksjon}:${item.tekst}`;
+          if (!unikeTekster.has(unikNøkkel)) {
+            unikeTekster.add(unikNøkkel);
             sisteTreff.push(item);
           }
         }
@@ -246,7 +261,7 @@
         filInnhold += `${item.tekst}\n\n`;
       });
 
-      const blob = new Blob([filInnhold], { type: 'text/plain;charset=utf-8' });
+      const blob = new Blob SomBlob([filInnhold], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
