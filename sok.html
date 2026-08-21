@@ -41,7 +41,7 @@
 
   <div class="card">
     <label for="fagInput">1. Velg fag:</label>
-    <input type="text" id="fagInput" list="fagListe" placeholder="Skriv for å søke fag (f.eks. Norsk, Matematikk)...">
+    <input type="text" id="fagInput" list="fagListe" placeholder="Skriv for å søke fag (f.eks. Samfunnsfag, Norsk)...">
     <datalist id="fagListe"></datalist>
     <div id="fagStatus" class="status">Laster fagliste fra Grep API...</div>
 
@@ -62,7 +62,7 @@
 
   <script>
     const API_BASE = "https://data.udir.no/kl06/v201906";
-    let aktivLaereplan = null;
+    let aktivLaereplanData = [];
     let sisteTreff = [];
     let aktivtFagNavn = "";
     let aktivFagKode = "";
@@ -76,6 +76,7 @@
       return "";
     }
 
+    // 1. Last inn alle læreplaner
     async function initFagliste() {
       try {
         const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
@@ -83,6 +84,8 @@
         const data = await res.json();
         
         const datalist = document.getElementById('fagListe');
+        datalist.innerHTML = '';
+        
         data.forEach(lp => {
           const tittelNavn = hentTekst(lp.tittel) || lp.kode || "Fag";
           const opt = document.createElement('option');
@@ -98,38 +101,81 @@
       }
     }
 
-    document.getElementById('fagInput').addEventListener('input', async (e) => {
-      const match = e.target.value.match(/\(([A-Z0-9-]+)\)$/);
+    // 2. Velg fag og hent alt innhold dypt
+    document.getElementById('fagInput').addEventListener('change', async (e) => {
+      const val = e.target.value;
+      const match = val.match(/\(([A-Z0-9-]+)\)$/);
+      
       if (match) {
         aktivFagKode = match[1];
-        aktivtFagNavn = e.target.value.replace(/\s*\([A-Z0-9-]+\)$/, '').trim();
+        aktivtFagNavn = val.replace(/\s*\([A-Z0-9-]+\)$/, '').trim();
         
         document.getElementById('fagStatus').className = "status";
-        document.getElementById('fagStatus').textContent = `Henter full læreplan for ${aktivFagKode}...`;
+        document.getElementById('fagStatus').textContent = `Henter full læreplan for ${aktivtFagNavn}...`;
         
         try {
           const res = await fetch(`${API_BASE}/laereplaner/${aktivFagKode}`, { headers: { 'Accept': 'application/json' } });
           if (!res.ok) throw new Error(`Kunne ikke hente ${aktivFagKode}`);
           
-          aktivLaereplan = await res.json();
+          const rawData = await res.json();
+          aktivLaereplanData = [];
           
-          document.getElementById('fagStatus').textContent = `Læreplan (${aktivFagKode}) er klar! Skriv inn stikkord under.`;
+          // Dyp utpakking av alle tekstforekomster
+          lesObjekt(rawData, "Generelt");
+          
+          document.getElementById('fagStatus').textContent = `Læreplan for ${aktivtFagNavn} er klar! Skriv inn stikkord under.`;
           document.getElementById('stikkordInput').disabled = false;
           document.getElementById('stikkordInput').focus();
           kjoerSoek();
-        } catch (e) {
+        } catch (err) {
           document.getElementById('fagStatus').className = "status error";
-          document.getElementById('fagStatus').textContent = "Kunne ikke hente læreplanen.";
-          console.error(e);
+          document.getElementById('fagStatus').textContent = "Kunne ikke laste valgte læreplan.";
+          console.error(err);
         }
       }
     });
 
+    // Hjelpefunksjon for å hente ut alt av tekstnoder uansett struktur
+    function lesObjekt(obj, naavaerendeSeksjon) {
+      if (!obj) return;
+
+      if (typeof obj === 'string') {
+        if (obj.trim().length > 3 && !obj.startsWith('http')) {
+          aktivLaereplanData.push({ seksjon: naavaerendeSeksjon, tekst: obj.trim() });
+        }
+        return;
+      }
+
+      if (Array.isArray(obj)) {
+        obj.forEach(i => lesObjekt(i, naavaerendeSeksjon));
+        return;
+      }
+
+      if (typeof obj === 'object') {
+        const t = hentTekst(obj);
+        if (t && (obj.nob || obj.nno || obj.se)) {
+          aktivLaereplanData.push({ seksjon: naavaerendeSeksjon, tekst: t.trim() });
+          return;
+        }
+
+        for (const [key, val] of Object.entries(obj)) {
+          let nySeksjon = naavaerendeSeksjon;
+          if (key.includes('kompetansemaal')) nySeksjon = 'Kompetansemål';
+          else if (key.includes('kjerneelementer')) nySeksjon = 'Kjerneelement';
+          else if (key.includes('tverrfagligeTemaer')) nySeksjon = 'Tverrfaglig tema';
+          else if (key.includes('grunnleggendeFerdigheter')) nySeksjon = 'Grunnleggende ferdighet';
+          else if (key.includes('omFaget') || key.includes('fagrelevans')) nySeksjon = 'Om faget';
+          else if (key.includes('vurdering')) nySeksjon = 'Vurdering';
+
+          lesObjekt(val, nySeksjon);
+        }
+      }
+    }
+
+    // 3. Søk i utpakket data
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
     function kjoerSoek() {
-      if (!aktivLaereplan) return;
-
       const søketekst = document.getElementById('stikkordInput').value.trim();
       const container = document.getElementById('resultatVisning');
       const downloadBtn = document.getElementById('downloadBtn');
@@ -143,56 +189,17 @@
       }
 
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
-      const funnetTekster = new Set();
+      const unikeTekster = new Set();
 
-      function leggTilTreff(tekst, seksjon) {
-        if (!tekst || typeof tekst !== 'string') return;
-        const renTekst = tekst.trim();
-        if (renTekst.length < 5 || funnetTekster.has(renTekst)) return;
-
-        const t = renTekst.toLowerCase();
+      aktivLaereplanData.forEach(item => {
+        const t = item.tekst.toLowerCase();
         if (ordListe.some(ord => t.includes(ord))) {
-          funnetTekster.add(renTekst);
-          sisteTreff.push({ seksjon: seksjon, tekst: renTekst });
-        }
-      }
-
-      // Rekursiv gjennomgang av JSON-objektet for å fange opp alt av fritekst
-      function traverserOgSoek(obj, naavaerendeSeksjon) {
-        if (!obj) return;
-
-        if (typeof obj === 'string') {
-          leggTilTreff(obj, naavaerendeSeksjon);
-          return;
-        }
-
-        if (Array.isArray(obj)) {
-          obj.forEach(item => traverserOgSoek(item, naavaerendeSeksjon));
-          return;
-        }
-
-        if (typeof obj === 'object') {
-          // Hvis det er et flerspråklig tekstobjekt (nob, nno, se)
-          if (obj.nob || obj.nno || obj.se) {
-            leggTilTreff(hentTekst(obj), naavaerendeSeksjon);
-            return;
-          }
-
-          for (const [key, val] of Object.entries(obj)) {
-            let nySeksjon = naavaerendeSeksjon;
-            if (key === 'kompetansemaal') nySeksjon = 'Kompetansemål';
-            else if (key === 'kjerneelementer') nySeksjon = 'Kjerneelement';
-            else if (key === 'tverrfagligeTemaer') nySeksjon = 'Tverrfaglig tema';
-            else if (key === 'grunnleggendeFerdigheter') nySeksjon = 'Grunnleggende ferdighet';
-            else if (key === 'omFaget' || key === 'fagrelevans') nySeksjon = 'Om faget';
-            else if (key === 'vurdering') nySeksjon = 'Vurdering';
-
-            traverserOgSoek(val, nySeksjon);
+          if (!unikeTekster.has(item.tekst)) {
+            unikeTekster.add(item.tekst);
+            sisteTreff.push(item);
           }
         }
-      }
-
-      traverserOgSoek(aktivLaereplan, 'Generelt');
+      });
 
       document.getElementById('treffTittel').textContent = `${sisteTreff.length} treff for "${søketekst}"`;
 
