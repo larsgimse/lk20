@@ -77,7 +77,7 @@
       return "";
     }
 
-    // 1. Last inn fag
+    // 1. Last inn fagliste
     async function initFagliste() {
       try {
         const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
@@ -100,7 +100,7 @@
       }
     }
 
-    // 2. Velg fag og hent data
+    // 2. Velg fag og hent læreplan
     document.getElementById('fagInput').addEventListener('input', async (e) => {
       const match = e.target.value.match(/\(([A-Z0-9-]+)\)$/);
       if (match) {
@@ -128,7 +128,7 @@
       }
     });
 
-    // 3. Søk
+    // 3. Utfør søk i alle deler av læreplanen
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
     function kjoerSoek() {
@@ -148,31 +148,52 @@
 
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
 
-      function soekIEnhet(elementer, seksjonsNavn) {
-        if (!Array.isArray(elementer)) return;
+      function sjekkOgLeggTil(tekst, seksjon) {
+        if (!tekst) return;
+        const t = tekst.toLowerCase();
+        if (ordListe.some(ord => t.includes(ord))) {
+          sisteTreff.push({ seksjon: seksjon, tekst: tekst });
+        }
+      }
 
-        elementer.forEach(el => {
-          let samletTekst = "";
-          if (el.tittel) samletTekst += hentTekst(el.tittel) + " ";
-          if (el.tekst) samletTekst += hentTekst(el.tekst) + " ";
-          if (el.beskrivelse) samletTekst += hentTekst(el.beskrivelse) + " ";
-          
-          samletTekst = samletTekst.trim();
+      // Søk i direkte kompetansemål
+      if (Array.isArray(aktivLaereplan.kompetansemaal)) {
+        aktivLaereplan.kompetansemaal.forEach(km => {
+          sjekkOgLeggTil(hentTekst(km.tittel) || hentTekst(km.tekst), "Kompetansemål");
+        });
+      }
 
-          if (samletTekst) {
-            const t = samletTekst.toLowerCase();
-            if (ordListe.some(ord => t.includes(ord))) {
-              sisteTreff.push({ seksjon: seksjonsNavn, tekst: samletTekst });
-            }
+      // Søk i nøstede kompetansemaalsett (per trinn)
+      if (Array.isArray(aktivLaereplan.kompetansemaalsett)) {
+        aktivLaereplan.kompetansemaalsett.forEach(sett => {
+          const settTittel = hentTekst(sett.tittel) || "Kompetansemål";
+          if (Array.isArray(sett.kompetansemaal)) {
+            sett.kompetansemaal.forEach(km => {
+              sjekkOgLeggTil(hentTekst(km.tittel) || hentTekst(km.tekst), settTittel);
+            });
           }
         });
       }
 
-      soekIEnhet(aktivLaereplan.kompetansemaal, "Kompetansemål");
-      soekIEnhet(aktivLaereplan.kjerneelementer, "Kjerneelement");
-      soekIEnhet(aktivLaereplan.tverrfagligeTemaer, "Tverrfaglig tema");
-      soekIEnhet(aktivLaereplan.grunnleggendeFerdigheter, "Grunnleggende ferdighet");
+      // Søk i kjerneelementer
+      if (Array.isArray(aktivLaereplan.kjerneelementer)) {
+        aktivLaereplan.kjerneelementer.forEach(ke => {
+          const tittel = hentTekst(ke.tittel);
+          const tekst = hentTekst(ke.tekst) || hentTekst(ke.beskrivelse);
+          sjekkOgLeggTil(`${tittel}: ${tekst}`, "Kjerneelement");
+        });
+      }
 
+      // Søk i tverrfaglige temaer
+      if (Array.isArray(aktivLaereplan.tverrfagligeTemaer)) {
+        aktivLaereplan.tverrfagligeTemaer.forEach(tt => {
+          const tittel = hentTekst(tt.tittel);
+          const tekst = hentTekst(tt.tekst) || hentTekst(tt.beskrivelse);
+          sjekkOgLeggTil(`${tittel}: ${tekst}`, "Tverrfaglig tema");
+        });
+      }
+
+      // Oppdater grensesnitt
       document.getElementById('treffTittel').textContent = `${sisteTreff.length} treff for "${søketekst}"`;
 
       if (sisteTreff.length === 0) {
@@ -183,7 +204,6 @@
 
       downloadBtn.style.display = 'inline-flex';
 
-      // Utheving av søkeord
       sisteTreff.forEach(item => {
         let visningsTekst = item.tekst;
         ordListe.forEach(ord => {
