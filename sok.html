@@ -11,12 +11,29 @@
     input { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 1rem; }
     input:disabled { background: #f1f5f9; cursor: not-allowed; }
     
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
     .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .result-tag { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.25rem; }
     .result-text { font-size: 0.95rem; line-height: 1.5; color: #334155; }
     mark { background: #fef08a; padding: 0 2px; border-radius: 2px; font-weight: 600; }
     .status { font-size: 0.875rem; color: #0284c7; font-weight: 500; }
     .error { color: #dc2626; }
+
+    .download-btn {
+      background-color: #0284c7;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background-color 0.2s ease;
+    }
+    .download-btn:hover { background-color: #0369a1; }
   </style>
 </head>
 <body>
@@ -25,7 +42,7 @@
 
   <div class="card">
     <label for="fagInput">1. Velg fag:</label>
-    <input type="text" id="fagInput" list="fagListe" placeholder="Skriv for å søke fag (f.eks. Norsk, Kunst)...">
+    <input type="text" id="fagInput" list="fagListe" placeholder="Skriv for å søke fag (f.eks. Norsk, Matematikk)...">
     <datalist id="fagListe"></datalist>
     <div id="fagStatus" class="status">Laster fagliste fra Grep API...</div>
 
@@ -35,19 +52,28 @@
     <input type="text" id="stikkordInput" placeholder="Skriv inn søkeord..." disabled>
   </div>
 
-  <div id="treffTittel" style="font-weight: 600; font-size: 1.1rem; margin-bottom: 0.75rem;"></div>
+  <div class="result-header">
+    <div id="treffTittel" style="font-weight: 600; font-size: 1.1rem;"></div>
+    <button id="downloadBtn" class="download-btn" style="display: none;" onclick="lastNedTekstfil()">
+      📥 Last ned resultat (.txt)
+    </button>
+  </div>
+  
   <div id="resultatVisning"></div>
 
   <script>
     const API_BASE = "https://data.udir.no/kl06/v201906";
     let aktivLaereplan = null;
+    let sisteTreff = [];
+    let aktivtFagNavn = "";
+    let aktivFagKode = "";
 
-    // Hjelpefunksjon: Henter ut ren tekst uansett om Udir sender streng, bokmål (nob), nynorsk (nno) eller samisk
+    // Hjelpefunksjon for å pakke ut tekst fra språkkoder
     function hentTekst(obj) {
       if (!obj) return "";
       if (typeof obj === "string") return obj;
       if (typeof obj === "object") {
-        return obj.nob || obj.nno || obj.default || obj.se || Object.values(obj).find(v => typeof v === "string") || "";
+        return obj.nob || obj.nno || obj.se || Object.values(obj).find(v => typeof v === "string") || "";
       }
       return "";
     }
@@ -61,35 +87,37 @@
         
         const datalist = document.getElementById('fagListe');
         data.forEach(lp => {
-          const tittel = hentTekst(lp.tittel) || lp.kode;
+          const tittelNavn = hentTekst(lp.tittel) || "Uten tittel";
           const opt = document.createElement('option');
-          opt.value = `${tittel} (${lp.kode})`;
+          opt.value = `${tittelNavn} (${lp.kode})`;
           datalist.appendChild(opt);
         });
 
         document.getElementById('fagStatus').textContent = `Klar! Lastet ${data.length} læreplaner.`;
       } catch (e) {
         document.getElementById('fagStatus').className = "status error";
-        document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir. Sjekk internettilkoblingen.";
+        document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir.";
         console.error(e);
       }
     }
 
     // 2. Last ned valgt læreplan
     document.getElementById('fagInput').addEventListener('input', async (e) => {
-      const match = e.target.value.match(/\(([A-Z0-9-]+)\)$/);
+      const match = e.target.value.match(/^(.*)\s+\(([A-Z0-9-]+)\)$/);
       if (match) {
-        const kode = match[1];
+        aktivtFagNavn = match[1].trim();
+        aktivFagKode = match[2];
+        
         document.getElementById('fagStatus').className = "status";
-        document.getElementById('fagStatus').textContent = `Henter full læreplan for ${kode}...`;
+        document.getElementById('fagStatus').textContent = `Henter full læreplan for ${aktivFagKode}...`;
         
         try {
-          const res = await fetch(`${API_BASE}/laereplaner/${kode}`, { headers: { 'Accept': 'application/json' } });
-          if (!res.ok) throw new Error(`Kunne ikke hente ${kode}`);
+          const res = await fetch(`${API_BASE}/laereplaner/${aktivFagKode}`, { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error(`Kunne ikke hente ${aktivFagKode}`);
           
           aktivLaereplan = await res.json();
           
-          document.getElementById('fagStatus').textContent = `Læreplan (${kode}) er lastet inn! Du kan nå søke i feltet under.`;
+          document.getElementById('fagStatus').textContent = `Læreplan (${aktivFagKode}) er lastet inn! Du kan nå søke i feltet under.`;
           document.getElementById('stikkordInput').disabled = false;
           document.getElementById('stikkordInput').focus();
           kjoerSoek();
@@ -101,7 +129,7 @@
       }
     });
 
-    // 3. Søk i alt innhold
+    // 3. Søk i innhold
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
     function kjoerSoek() {
@@ -109,22 +137,22 @@
 
       const søketekst = document.getElementById('stikkordInput').value.trim();
       const container = document.getElementById('resultatVisning');
+      const downloadBtn = document.getElementById('downloadBtn');
       container.innerHTML = '';
+      sisteTreff = [];
 
       if (søketekst.length < 2) {
         document.getElementById('treffTittel').textContent = '';
+        downloadBtn.style.display = 'none';
         return;
       }
 
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
-      const treff = [];
 
-      // Dyp-søk funksjon som går gjennom arrayer av elementer i læreplanen
       function soekIEnhet(elementer, seksjonsNavn) {
         if (!Array.isArray(elementer)) return;
 
         elementer.forEach(el => {
-          // Hent ut alt av tekst fra elementet (tittel, beskrivelse, tekst osv.)
           let samletTekst = "";
           if (el.tittel) samletTekst += hentTekst(el.tittel) + " ";
           if (el.tekst) samletTekst += hentTekst(el.tekst) + " ";
@@ -134,32 +162,32 @@
 
           if (samletTekst) {
             const t = samletTekst.toLowerCase();
-            // Sjekk om ALLE eller MINST ETT ord treffer (her sjekker vi om minst ett ord treffer)
             if (ordListe.some(ord => t.includes(ord))) {
-              treff.push({ seksjon: seksjonsNavn, tekst: samletTekst });
+              sisteTreff.push({ seksjon: seksjonsNavn, tekst: samletTekst });
             }
           }
         });
       }
 
-      // Søk i alle relevante deler av læreplanstrukturen
       soekIEnhet(aktivLaereplan.kompetansemaal, "Kompetansemål");
       soekIEnhet(aktivLaereplan.kjerneelementer, "Kjerneelement");
       soekIEnhet(aktivLaereplan.tverrfagligeTemaer, "Tverrfaglig tema");
       soekIEnhet(aktivLaereplan.grunnleggendeFerdigheter, "Grunnleggende ferdighet");
 
-      // Vis treff
-      document.getElementById('treffTittel').textContent = `${treff.length} treff for "${søketekst}"`;
+      document.getElementById('treffTittel').textContent = `${sisteTreff.length} treff for "${søketekst}"`;
 
-      if (treff.length === 0) {
-        container.innerHTML = `<div style="color: #64748b; font-style: italic;">Ingen treff på "${søketekst}" i denne læreplanen. Prøv et annet ord eller sjekk at faget er rigtig valgt.</div>`;
+      if (sisteTreff.length === 0) {
+        downloadBtn.style.display = 'none';
+        container.innerHTML = `<div style="color: #64748b; font-style: italic;">Ingen treff på "${søketekst}" i denne læreplanen.</div>`;
         return;
       }
 
-      // Bygg regExp for å utheve ord
+      // Vis nedlastingsknappen når det er treff
+      downloadBtn.style.display = 'inline-flex';
+
       const regExp = new RegExp(`(${ordListe.map(o => o.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
 
-      treff.forEach(item => {
+      sisteTreff.forEach(item => {
         const framhevetTekst = item.tekst.replace(regExp, '<mark>$1</mark>');
         
         const card = document.createElement('div');
@@ -170,6 +198,39 @@
         `;
         container.appendChild(card);
       });
+    }
+
+    // 4. Generer og last ned tekstfil
+    function lastNedTekstfil() {
+      if (sisteTreff.length === 0) return;
+
+      const søketekst = document.getElementById('stikkordInput').value.trim();
+      const dato = new Date().toLocaleDateString('no-NO');
+
+      let filInnhold = `==================================================\n`;
+      filInnhold += `LK20 LÆREPLANSØK - RESULTATER\n`;
+      filInnhold += `Fag: ${aktivtFagNavn} (${aktivFagKode})\n`;
+      filInnhold += `Søkeord: "${søketekst}"\n`;
+      filInnhold += `Dato: ${dato}\n`;
+      filInnhold += `Antall treff: ${sisteTreff.length}\n`;
+      filInnhold += `==================================================\n\n`;
+
+      sisteTreff.forEach((item, index) => {
+        filInnhold += `[${index + 1}] ${item.seksjon.toUpperCase()}\n`;
+        filInnhold += `${item.tekst}\n\n`;
+        filInnhold += `--------------------------------------------------\n\n`;
+      });
+
+      // Opprett nedlastbar Blob og utløs nedlasting i browseren
+      const blob = new Blob([filInnhold], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lk20_soek_${aktivFagKode}_${søketekst.replace(/[^a-zA-Z0-9æøåÆØÅ]/g, '_')}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
 
     initFagliste();
