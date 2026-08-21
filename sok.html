@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LK20 Stikkordsøk - Flere Læreplaner</title>
+  <title>LK20 Stikkordsøk</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 850px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #f8fafc; }
     .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -15,7 +15,8 @@
     .checkbox-container { max-height: 220px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; }
     .checkbox-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
     .checkbox-item:hover { background-color: #f1f5f9; }
-    .checkbox-item input { cursor: pointer; }
+    
+    .global-toggle { display: flex; align-items: center; gap: 0.5rem; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-weight: 600; color: #0369a1; cursor: pointer; }
 
     .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
     .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -47,18 +48,24 @@
   <h2>Søk i LK20 Læreplaner</h2>
 
   <div class="card">
-    <label>1. Velg én eller flere læreplaner:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Filtrer fagliste (f.eks. Norsk, Samfunnsfag)..." oninput="filtrerFagliste()">
+    <label>1. Velg en eller flere læreplaner:</label>
+    <input type="text" id="fagFilter" class="search-box" placeholder="Filtrer fagliste (f.eks. Norsk, Naturfag, Samfunnsfag)..." oninput="filtrerFagliste()">
     
     <div class="checkbox-container" id="fagListeContainer">
-      <div style="color: #64748b; font-style: italic; padding: 0.5rem;">Laster fag fra Udir...</div>
+      <div style="color: #64748b; font-style: italic; padding: 0.5rem;">Laster LK20-fag fra Udir...</div>
     </div>
     
-    <div id="fagStatus" class="status">Laster fagliste fra Grep API...</div>
+    <div id="fagStatus" class="status">Laster LK20 fagliste fra Grep API...</div>
 
     <hr style="margin: 1.25rem 0; border: 0; border-top: 1px solid #e2e8f0;">
 
     <label for="stikkordInput">2. Søk etter stikkord:</label>
+
+    <label class="global-toggle">
+      <input type="checkbox" id="soekAlleToggle" onchange="haandterGlobalToggle()">
+      <span>Søk på tvers av ALLE læreplaner i LK20 (overstyrer valg ovenfor)</span>
+    </label>
+
     <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn søkeord (f.eks. digital, kildekritikk)..." disabled>
   </div>
 
@@ -77,6 +84,7 @@
     let valgteKoder = new Set();
     let kombinertLaereplanData = [];
     let sisteTreff = [];
+    let erAlleLadetGlobalt = false;
 
     function hentTekst(obj) {
       if (!obj) return "";
@@ -87,38 +95,36 @@
       return "";
     }
 
-    // 1. Last inn alle fag og ekstraher fulle fagnavn
+    // Ekstraher reelt fagnavn fra Udir sine nøstede objekter
+    function finnFagNavn(lp) {
+      let navn = hentTekst(lp.tittel) || hentTekst(lp.navn) || hentTekst(lp.overskrift);
+      
+      if (!navn || navn === lp.kode) {
+        if (lp['tittel-default']) navn = lp['tittel-default'];
+        else if (lp.kodeTittel && lp.kodeTittel.length > 0) navn = hentTekst(lp.kodeTittel[0].tittel);
+      }
+      return navn || lp.kode;
+    }
+
+    // 1. Last inn LK20-læreplaner
     async function initFagliste() {
       try {
-        const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) throw new Error(`HTTP feil: ${res.status}`);
+        // Bruker uttrykkelig laereplaner-lk20 for å unngå utgåtte koder
+        let res = await fetch(`${API_BASE}/laereplaner-lk20`, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) {
+          // Fallback til /laereplaner dersom alt-i-ett endepunkt brukes
+          res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
+        }
+        
         const data = await res.json();
         
-        alleFagListe = data.map(lp => {
-          let navn = "";
-
-          // Sjekk flere mulige nøkler for tittel/navn i API-responsen
-          if (lp.tittel) navn = hentTekst(lp.tittel);
-          if (!navn && lp.navn) navn = hentTekst(lp.navn);
-          if (!navn && lp.overskrift) navn = hentTekst(lp.overskrift);
-
-          // Hvis navnet fortsatt matcher koden eller mangler
-          if (!navn || navn === lp.kode) {
-            if (typeof lp.tittel === 'object') {
-              navn = lp.tittel.nob || lp.tittel.nno || lp.tittel.se || lp.kode;
-            } else {
-              navn = lp.kode;
-            }
-          }
-
-          return {
-            kode: lp.kode,
-            navn: navn
-          };
-        }).sort((a, b) => a.navn.localeCompare(b.navn, 'no'));
+        alleFagListe = data.map(lp => ({
+          kode: lp.kode,
+          navn: finnFagNavn(lp)
+        })).sort((a, b) => a.navn.localeCompare(b.navn, 'no'));
 
         tegnFagliste(alleFagListe);
-        document.getElementById('fagStatus').textContent = `Klar! Lastet ${alleFagListe.length} læreplaner. Velg fag ovenfor.`;
+        document.getElementById('fagStatus').textContent = `Klar! Lastet ${alleFagListe.length} LK20-læreplaner. Velg fag ovenfor eller hukk av for søk i alle.`;
       } catch (e) {
         document.getElementById('fagStatus').className = "status error";
         document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir.";
@@ -155,8 +161,10 @@
       tegnFagliste(filtrert);
     }
 
-    // 2. Håndter valgte læreplaner
+    // 2. Håndter valg av fag
     async function haandterFagValg(e, fag) {
+      if (document.getElementById('soekAlleToggle').checked) return;
+
       if (e.target.checked) {
         valgteKoder.add(fag.kode);
       } else {
@@ -171,30 +179,69 @@
         return;
       }
 
+      await lastInnDataForKoder(Array.from(valgteKoder));
+    }
+
+    // 3. Håndter "Søk i alle"-bryter
+    async function haandterGlobalToggle() {
+      const isGlobal = document.getElementById('soekAlleToggle').checked;
+      const filterInput = document.getElementById('fagFilter');
+      
+      filterInput.disabled = isGlobal;
+      document.querySelectorAll('#fagListeContainer input').forEach(i => i.disabled = isGlobal);
+
+      if (isGlobal) {
+        if (!erAlleLadetGlobalt) {
+          document.getElementById('fagStatus').className = "status";
+          document.getElementById('fagStatus').textContent = "Henter data for ALLE læreplaner i LK20 (dette kan ta et par sekunder)...";
+          const alleKoder = alleFagListe.map(f => f.kode);
+          await lastInnDataForKoder(alleKoder);
+          erAlleLadetGlobalt = true;
+        } else {
+          document.getElementById('stikkordInput').disabled = false;
+          kjoerSoek();
+        }
+      } else {
+        if (valgteKoder.size > 0) {
+          await lastInnDataForKoder(Array.from(valgteKoder));
+        } else {
+          kombinertLaereplanData = [];
+          document.getElementById('stikkordInput').disabled = true;
+          document.getElementById('fagStatus').textContent = "Ingen fag valgt.";
+          kjoerSoek();
+        }
+      }
+    }
+
+    // Felles lastefunksjon for valgte eller alle koder
+    async function lastInnDataForKoder(kodeliste) {
       document.getElementById('fagStatus').className = "status";
-      document.getElementById('fagStatus').textContent = `Henter data for ${valgteKoder.size} valgte læreplan(er)...`;
+      document.getElementById('fagStatus').textContent = `Laster innhold for ${kodeliste.length} læreplan(er)...`;
 
       kombinertLaereplanData = [];
       
-      for (const kode of valgteKoder) {
+      // Hent alle oppgitte læreplaner i sekvens/puljer
+      for (const kode of kodeliste) {
         const fagObj = alleFagListe.find(f => f.kode === kode);
+        const visningsNavn = fagObj ? fagObj.navn : kode;
         try {
           const res = await fetch(`${API_BASE}/laereplaner/${kode}`, { headers: { 'Accept': 'application/json' } });
           if (res.ok) {
             const rawData = await res.json();
-            lesObjekt(rawData, "Generelt", fagObj.navn);
+            lesObjekt(rawData, "Generelt", visningsNavn);
           }
         } catch (err) {
           console.error(`Kunne ikke hente ${kode}`, err);
         }
       }
 
-      document.getElementById('fagStatus').textContent = `Klar! Lastet inn ${valgteKoder.size} læreplan(er). Skriv inn søkeord.`;
+      document.getElementById('fagStatus').textContent = `Klar! Innhold for ${kodeliste.length} læreplan(er) er klart. Skriv inn søkeord.`;
       document.getElementById('stikkordInput').disabled = false;
+      document.getElementById('stikkordInput').focus();
       kjoerSoek();
     }
 
-    // Rekursiv utpakking med fagnavn og trinntitler
+    // Rekursiv utpakking
     function lesObjekt(obj, naavaerendeSeksjon, fagNavn) {
       if (!obj) return;
 
@@ -211,7 +258,6 @@
       }
 
       if (typeof obj === 'object') {
-        // Spesifikk håndtering for kompetansemål og trinn
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
             const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "";
@@ -249,7 +295,7 @@
       }
     }
 
-    // 3. Utfør søk
+    // 4. Utfør søk
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
     function kjoerSoek() {
@@ -283,7 +329,7 @@
 
       if (sisteTreff.length === 0) {
         downloadBtn.style.display = 'none';
-        container.innerHTML = `<div style="color: #64748b; font-style: italic;">Ingen treff på "${søketekst}" i valgte læreplaner.</div>`;
+        container.innerHTML = `<div style="color: #64748b; font-style: italic;">Ingen treff på "${søketekst}" i søkte læreplaner.</div>`;
         return;
       }
 
@@ -309,7 +355,7 @@
       });
     }
 
-    // 4. Last ned tekstfil
+    // 5. Last ned tekstfil
     function lastNedTekstfil() {
       if (sisteTreff.length === 0) return;
 
@@ -317,7 +363,7 @@
       const dato = new Date().toLocaleDateString('no-NO');
 
       let filInnhold = `LK20 LÆREPLANSØK - RESULTATER\n`;
-      filInnhold += `Valgte fag: ${Array.from(valgteKoder).join(', ')}\n`;
+      filInnhold += `Søkeområde: ${document.getElementById('soekAlleToggle').checked ? 'Alle LK20 læreplaner' : Array.from(valgteKoder).join(', ')}\n`;
       filInnhold += `Søkeord: "${søketekst}"\n`;
       filInnhold += `Dato: ${dato}\n`;
       filInnhold += `Antall treff: ${sisteTreff.length}\n`;
@@ -332,7 +378,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lk20_soek_kombinert_${søketekst}.txt`;
+      a.download = `lk20_soek_${søketekst}.txt`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
