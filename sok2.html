@@ -12,7 +12,9 @@
     .search-box { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
     .search-box:disabled { background: #f1f5f9; cursor: not-allowed; }
     
-    .checkbox-container { max-height: 250px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; }
+    /* Containeren skjules automatisk når den er tom */
+    .checkbox-container { max-height: 250px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; display: none; }
+    .checkbox-container.has-content { display: block; }
     .checkbox-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
     .checkbox-item:hover { background-color: #f1f5f9; }
     
@@ -24,6 +26,11 @@
     .progress-container { width: 100%; background-color: #e2e8f0; border-radius: 6px; height: 16px; overflow: hidden; position: relative; }
     .progress-bar { height: 100%; background-color: #0284c7; width: 0%; transition: width 0.15s ease; }
     .progress-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 0.75rem; font-weight: 700; color: #1e293b; line-height: 16px; }
+
+    .selected-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .badge-item { background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .badge-remove { cursor: pointer; font-weight: bold; color: #0284c7; }
+    .badge-remove:hover { color: #dc2626; }
 
     .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
     .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -57,14 +64,16 @@
   <h2>Søk i LK20 Læreplaner</h2>
 
   <div class="card">
-    <!-- 1. Velg fag øverst igjennom -->
+    <!-- 1. Velg fag -->
     <label>1. Velg en eller flere læreplaner:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Skriv for å filtrere fag (f.eks. Norsk, Naturfag)..." oninput="filtrerFagliste()">
+    <input type="text" id="fagFilter" class="search-box" placeholder="Begynn å skrive for å søke fag (f.eks. Norsk, Naturfag)..." oninput="filtrerFagliste()">
     
-    <div class="checkbox-container" id="fagListeContainer">
-      <div style="color: #64748b; font-style: italic; padding: 0.5rem;">Laster og oversetter fagnavn fra Udir...</div>
-    </div>
+    <!-- Liste som kun vises ved tekst i søkefeltet -->
+    <div class="checkbox-container" id="fagListeContainer"></div>
     
+    <!-- Visning av fag som allerede er valgt -->
+    <div id="valgteFagBadges" class="selected-badges"></div>
+
     <label class="global-toggle">
       <input type="checkbox" id="soekAlleToggle" onchange="haandterGlobalToggle()">
       <span>Søk på tvers av ALLE læreplaner i LK20 (søk direkte uten å velge fag)</span>
@@ -155,8 +164,7 @@
           url: lp.url || `${API_BASE}/laereplaner/${lp.kode}`
         })).sort((a, b) => a.navn.localeCompare(b.navn, 'no'));
 
-        tegnFagliste(alleFagListe);
-        document.getElementById('fagStatus').textContent = `Klar! Lastet ${alleFagListe.length} læreplaner. Velg fag fra listen over.`;
+        document.getElementById('fagStatus').textContent = `Klar! Søk etter og velg fag fra feltet over.`;
       } catch (e) {
         document.getElementById('fagStatus').className = "status error";
         document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir.";
@@ -167,6 +175,13 @@
     function tegnFagliste(liste) {
       const container = document.getElementById('fagListeContainer');
       container.innerHTML = '';
+
+      if (liste.length === 0) {
+        container.classList.remove('has-content');
+        return;
+      }
+
+      container.classList.add('has-content');
 
       liste.forEach(fag => {
         const label = document.createElement('label');
@@ -187,14 +202,45 @@
       });
     }
 
+    // Viser INGEN forslag før brukeren begynner å skrive i søkefeltet (viser da maks 4)
     function filtrerFagliste() {
       const sok = document.getElementById('fagFilter').value.trim().toLowerCase();
       if (!sok) {
-        tegnFagliste(alleFagListe);
+        tegnFagliste([]);
         return;
       }
       const filtrert = alleFagListe.filter(f => f.navn.toLowerCase().includes(sok) || f.kode.toLowerCase().includes(sok));
       tegnFagliste(filtrert.slice(0, 4));
+    }
+
+    function oppdaterValgteBadges() {
+      const container = document.getElementById('valgteFagBadges');
+      container.innerHTML = '';
+
+      valgteKoder.forEach(kode => {
+        const fagObj = alleFagListe.find(f => f.kode === kode);
+        const navn = fagObj ? fagObj.navn : kode;
+
+        const badge = document.createElement('span');
+        badge.className = 'badge-item';
+        badge.innerHTML = `${navn} <span class="badge-remove" onclick="fjernValgtFag('${kode}')">&times;</span>`;
+        container.appendChild(badge);
+      });
+    }
+
+    async function fjernValgtFag(kode) {
+      valgteKoder.delete(kode);
+      oppdaterValgteBadges();
+      filtrerFagliste();
+
+      if (valgteKoder.size === 0) {
+        kombinertLaereplanData = [];
+        document.getElementById('stikkordInput').disabled = true;
+        document.getElementById('fagStatus').textContent = "Ingen fag valgt.";
+        kjoerSoek();
+      } else {
+        await lastInnDataForKoder(Array.from(valgteKoder));
+      }
     }
 
     async function haandterFagValg(e, fag) {
@@ -205,6 +251,8 @@
       } else {
         valgteKoder.delete(fag.kode);
       }
+
+      oppdaterValgteBadges();
 
       if (valgteKoder.size === 0) {
         kombinertLaereplanData = [];
@@ -225,6 +273,7 @@
       document.querySelectorAll('#fagListeContainer input').forEach(i => i.disabled = isGlobal);
 
       if (isGlobal) {
+        tegnFagliste([]);
         if (!erAlleLadetGlobalt) {
           const alleKoder = alleFagListe.map(f => f.kode);
           await lastInnDataForKoder(alleKoder, true);
@@ -235,6 +284,7 @@
         }
       } else {
         document.getElementById('loadingInfoBox').style.display = 'none';
+        filtrerFagliste();
         if (valgteKoder.size > 0) {
           await lastInnDataForKoder(Array.from(valgteKoder));
         } else {
