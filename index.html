@@ -120,18 +120,18 @@
         <select id="trinnFilter" class="select-input" onchange="kjoerSoek()">
           <option value="alle">Alle trinn / Generelt</option>
           <optgroup label="Barneskole">
-            <option value="1.">1. trinn</option>
-            <option value="2.">2. trinn</option>
-            <option value="3.">3. trinn</option>
-            <option value="4.">4. trinn</option>
-            <option value="5.">5. trinn</option>
-            <option value="6.">6. trinn</option>
-            <option value="7.">7. trinn</option>
+            <option value="1">1. trinn</option>
+            <option value="2">2. trinn</option>
+            <option value="3">3. trinn</option>
+            <option value="4">4. trinn</option>
+            <option value="5">5. trinn</option>
+            <option value="6">6. trinn</option>
+            <option value="7">7. trinn</option>
           </optgroup>
           <optgroup label="Ungdomsskole">
-            <option value="8.">8. trinn</option>
-            <option value="9.">9. trinn</option>
-            <option value="10.">10. trinn</option>
+            <option value="8">8. trinn</option>
+            <option value="9">9. trinn</option>
+            <option value="10">10. trinn</option>
           </optgroup>
           <optgroup label="Videregående">
             <option value="vg1">Vg1</option>
@@ -497,6 +497,28 @@
 
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
+    function sjekkTrinnMatch(seksjonTekst, trinnValg) {
+      if (trinnValg === 'alle') return true;
+
+      const seksjon = seksjonTekst.toLowerCase();
+
+      // Videregående (Vg1, Vg2, Vg3)
+      if (trinnValg.startsWith('vg')) {
+        return seksjon.includes(trinnValg);
+      }
+
+      // Grunnskole (1. - 10. trinn)
+      const tall = trinnValg;
+      
+      const harTallOgTrinn = seksjon.includes(`${tall}. trinn`) || 
+                             seksjon.includes(`${tall}.trinn`) || 
+                             seksjon.includes(`${tall}. årstrinn`) ||
+                             seksjon.includes(`${tall}.årstrinn`) ||
+                             seksjon.includes(`etter ${tall}.`);
+
+      return harTallOgTrinn;
+    }
+
     function kjoerSoek() {
       const søketekst = document.getElementById('stikkordInput').value.trim();
       const seksjonValg = document.getElementById('seksjonFilter').value;
@@ -518,20 +540,17 @@
       const unikeTekster = new Set();
 
       kombinertLaereplanData.forEach(item => {
-        // Seksjonsfiltrering
+        // 1. Seksjonsfiltrering
         if (seksjonValg !== 'alle' && !item.seksjon.toLowerCase().includes(seksjonValg.toLowerCase())) {
           return;
         }
 
-        // Trinnfiltrering i søkeresultater
-        if (trinnValg !== 'alle') {
-          const erKompetansemaal = item.seksjon.toLowerCase().includes('kompetansemål');
-          if (erKompetansemaal) {
-            const harTrinn = item.seksjon.toLowerCase().includes(trinnValg.toLowerCase());
-            if (!harTrinn) return;
-          }
+        // 2. Trinnfiltrering (Sjekker om seksjonen matcher det valgte trinnet)
+        if (!sjekkTrinnMatch(item.seksjon, trinnValg)) {
+          return;
         }
 
+        // 3. Tekstsøk
         const t = item.tekst.toLowerCase();
         if (ordListe.some(ord => t.includes(ord))) {
           const unikNøkkel = `${item.fagNavn}:${item.seksjon}:${item.tekst}`;
