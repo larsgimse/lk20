@@ -129,9 +129,14 @@
       return "";
     }
 
+    function eksaktKode(kode) {
+      if (!kode) return "";
+      return kode.split('_')[0]; 
+    }
+
     function dekodFagnavn(lp) {
       let navn = hentTekst(lp.tittel) || hentTekst(lp.navn) || hentTekst(lp.overskrift);
-      const renKode = lp.kode.split('_')[0].toUpperCase();
+      const renKode = eksaktKode(lp.kode);
       
       if (!navn || navn === lp.kode || /^[A-Z0-9-]+$/.test(navn)) {
         const prefiks = renKode.replace(/[^A-Z]/g, '');
@@ -146,8 +151,8 @@
       return navn;
     }
 
-    function byggUdirUrl(kode, rawData) {
-      const renKode = kode.split('_')[0].toLowerCase();
+    function byggUdirUrl(kode) {
+      const renKode = eksaktKode(kode).toLowerCase();
       return `https://www.udir.no/lk20/${renKode}`;
     }
 
@@ -210,9 +215,9 @@
       const filtrert = alleFagListe.filter(f => 
         f.navn.toLowerCase().includes(sok) || 
         f.kode.toLowerCase().includes(sok) ||
-        f.kode.replace('-', '').toLowerCase().includes(sok)
+        f.kode.replace(/[-_]/g, '').toLowerCase().includes(sok)
       );
-      tegnFagliste(filtrert.slice(0, 4));
+      tegnFagliste(filtrert.slice(0, 10));
     }
 
     function oppdaterValgteBadges() {
@@ -326,10 +331,10 @@
             let reeltNavn = visningsNavn;
             if (rawData.tittel) {
               const funnetTittel = hentTekst(rawData.tittel);
-              if (funnetTittel) reeltNavn = `${funnetTittel} (${kode.split('_')[0]})`;
+              if (funnetTittel) reeltNavn = `${funnetTittel} (${eksaktKode(kode)})`;
             }
 
-            const udirUrl = byggUdirUrl(kode, rawData);
+            const udirUrl = byggUdirUrl(kode);
             lesObjekt(rawData, "Generelt", reeltNavn, udirUrl, kode);
           }
         } catch (err) {
