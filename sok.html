@@ -109,7 +109,7 @@
     let sisteTreff = [];
     let erAlleLadetGlobalt = false;
 
-    // Dynamisk henting av alle tekstverdier i tittel-objektet uansett språk eller fagsammensetning
+    // Henter ut alle språkversjoner fra Grep sitt tittel-objekt (nob, nno, sme, smj, sma osv.)
     function hentTittelSokestreng(tittelObj) {
       if (!tittelObj) return "";
       if (typeof tittelObj === "string") return tittelObj;
@@ -121,23 +121,19 @@
       return "";
     }
 
-    function hentVisningsNavn(tittelObj, kode) {
-      if (!tittelObj) return kode;
-      if (typeof tittelObj === "string") return `${tittelObj} (${kode})`;
-      if (typeof tittelObj === "object") {
-        const navn = tittelObj.nob || tittelObj.nno || tittelObj.se || Object.values(tittelObj).find(v => typeof v === "string") || kode;
-        return `${navn} (${kode})`;
-      }
-      return kode;
-    }
-
+    // Prioriterer språkversjoner i henhold til Udirs Grep-standard
     function hentTekst(obj) {
       if (!obj) return "";
       if (typeof obj === "string") return obj;
       if (typeof obj === "object") {
-        return obj.nob || obj.nno || obj.se || obj.tittel || Object.values(obj).find(v => typeof v === "string") || "";
+        return obj.nob || obj.nno || obj.sme || obj.se || obj.smj || obj.sma || obj.tittel || Object.values(obj).find(v => typeof v === "string") || "";
       }
       return "";
+    }
+
+    function hentVisningsNavn(tittelObj, kode) {
+      const navn = hentTekst(tittelObj);
+      return navn ? `${navn} (${kode})` : kode;
     }
 
     function byggUdirUrl(kode) {
@@ -153,7 +149,8 @@
 
     async function initFagliste() {
       try {
-        const res = await fetch(`${API_BASE}/laereplaner`, { headers: { 'Accept': 'application/json' } });
+        // Bruker det spesifikke 'laereplaner-lk20' endepunktet fra Grep wiki
+        const res = await fetch(`${API_BASE}/laereplaner-lk20`, { headers: { 'Accept': 'application/json' } });
         if (!res.ok) throw new Error(`HTTP feil: ${res.status}`);
         const data = await res.json();
         
@@ -166,7 +163,6 @@
             kode: lp.kode,
             navn: visningsNavn,
             erUtgaatt: erUtgaatt,
-            // Generelt søk som inkluderer alt av tittelinnhold fra JSON pluss koden
             sokefelt: `${tittelTekst} ${lp.kode}`.toLowerCase(),
             url: lp.url || byggUdirUrl(lp.kode)
           };
@@ -175,10 +171,10 @@
           return a.navn.localeCompare(b.navn, 'no');
         });
 
-        document.getElementById('fagStatus').textContent = `Klar! Søk etter og velg fag fra feltet over.`;
+        document.getElementById('fagStatus').textContent = `Klar! Søk etter og velg fag fra feltet over. (${alleFagListe.length} LK20-læreplaner funnet)`;
       } catch (e) {
         document.getElementById('fagStatus').className = "status error";
-        document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir.";
+        document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir API.";
         console.error(e);
       }
     }
@@ -336,7 +332,8 @@
         const fagObj = alleFagListe.find(f => f.kode === kode);
         const visningsNavn = fagObj ? fagObj.navn : kode;
         try {
-          const res = await fetch(`${API_BASE}/laereplaner/${kode}`, { headers: { 'Accept': 'application/json' } });
+          // LK20-spesifikk oppslag i henhold til Grep sine API-regler
+          const res = await fetch(`${API_BASE}/laereplaner-lk20/${kode}`, { headers: { 'Accept': 'application/json' } });
           if (res.ok) {
             const rawData = await res.json();
             
@@ -373,6 +370,7 @@
       kjoerSoek();
     }
 
+    // Rekursiv parser oppdatert etter LK20 sine standard nøkkelnavn i Grep Wiki
     function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode) {
       if (!obj) return;
 
@@ -389,6 +387,7 @@
       }
 
       if (typeof obj === 'object') {
+        // LK20 spesifikk struktur for kompetansemålsett
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
             const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "Kompetansemål";
@@ -403,18 +402,21 @@
           });
         }
 
+        // LK20 seksjonsgjenkjenning fra datamodellen
         for (const [key, val] of Object.entries(obj)) {
           if (key === 'kompetansemaalsett') continue;
 
           let nySeksjon = naavaerendeSeksjon;
-          if (key.includes('fagrelevans')) nySeksjon = 'Fagets relevans og verdier';
-          else if (key.includes('kjerneelementer')) nySeksjon = 'Kjerneelementer';
-          else if (key.includes('tverrfagligeTemaer')) nySeksjon = 'Tverrfaglige temaer';
-          else if (key.includes('grunnleggendeFerdigheter')) nySeksjon = 'Grunnleggende ferdigheter';
-          else if (key.includes('underVurdering') || key.includes('underveisvurdering')) nySeksjon = 'Underveisvurdering';
-          else if (key.includes('sluttvurdering') || key.includes('vurdering')) nySeksjon = 'Vurdering';
+          const keyLower = key.toLowerCase();
 
-          if (val && typeof val === 'object' && (val.nob || val.nno || val.se)) {
+          if (keyLower.includes('fagrelevans')) nySeksjon = 'Fagets relevans og verdier';
+          else if (keyLower.includes('kjerneelementer')) nySeksjon = 'Kjerneelementer';
+          else if (keyLower.includes('tverrfaglig')) nySeksjon = 'Tverrfaglige temaer';
+          else if (keyLower.includes('grunnleggende')) nySeksjon = 'Grunnleggende ferdigheter';
+          else if (keyLower.includes('underveis')) nySeksjon = 'Underveisvurdering';
+          else if (keyLower.includes('sluttvurdering') || keyLower.includes('vurdering')) nySeksjon = 'Vurdering';
+
+          if (val && typeof val === 'object' && (val.nob || val.nno || val.sme || val.se)) {
             const tekst = hentTekst(val);
             if (tekst && tekst.length > 3) {
               kombinertLaereplanData.push({ fagNavn, seksjon: nySeksjon, tekst: tekst.trim(), url: udirUrl, kode: fagKode });
@@ -465,7 +467,7 @@
 
       downloadBtn.style.display = 'inline-flex';
 
-      sisteTreff.forEach(item => {
+      sisteTekst = sisteTreff.map(item => {
         let visningsTekst = item.tekst;
         ordListe.forEach(ord => {
           const regex = new RegExp(`(${ord})`, 'gi');
