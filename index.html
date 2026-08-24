@@ -441,8 +441,8 @@
     }
 
     function henteTrinnTekst(obj) {
-      let funnetTekst = "";
-      if (!obj) return funnetTekst;
+      if (!obj) return "";
+      let funnet = [];
 
       if (typeof obj === 'string') return obj;
 
@@ -451,12 +451,16 @@
       }
 
       if (typeof obj === 'object') {
-        if (obj.tittel) funnetTekst += " " + hentTekst(obj.tittel);
-        if (obj.overskrift) funnetTekst += " " + hentTekst(obj.overskrift);
-        if (obj.kode) funnetTekst += " " + obj.kode;
-        if (obj.trinn) funnetTekst += " " + JSON.stringify(obj.trinn);
+        if (obj.tittel) funnet.push(hentTekst(obj.tittel));
+        if (obj.overskrift) funnet.push(hentTekst(obj.overskrift));
+        if (obj.kode) funnet.push(obj.kode);
+        if (obj.beskrivelse) funnet.push(hentTekst(obj.beskrivelse));
+        
+        if (obj.trinn) funnet.push(JSON.stringify(obj.trinn));
+        if (obj.aarstrinn) funnet.push(JSON.stringify(obj.aarstrinn));
       }
-      return funnetTekst;
+
+      return funnet.join(" ");
     }
 
     function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode) {
@@ -484,9 +488,10 @@
       if (typeof obj === 'object') {
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
-            const trinnTekst = henteTrinnTekst(sett);
-            const overskrift = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || trinnTekst || "Kompetansemål";
-            
+            const trinnInfo = henteTrinnTekst(sett);
+            const overskrift = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || trinnInfo || "Kompetansemål";
+            const sammensattSeksjon = `Kompetansemål – ${overskrift}`;
+
             if (Array.isArray(sett.kompetansemaal)) {
               sett.kompetansemaal.forEach(km => {
                 const kmTekst = hentTekst(km.tittel) || hentTekst(km.tekst) || hentTekst(km.beskrivelse);
@@ -494,7 +499,7 @@
                   kombinertLaereplanData.push({ 
                     id: Math.random().toString(36).substr(2, 9), 
                     fagNavn, 
-                    seksjon: `Kompetansemål – ${overskrift}`, 
+                    seksjon: sammensattSeksjon, 
                     tekst: kmTekst.trim(), 
                     url: udirUrl, 
                     kode: fagKode 
@@ -517,6 +522,13 @@
           else if (keyLower.includes('grunnleggende')) nySeksjon = 'Grunnleggende ferdigheter';
           else if (keyLower.includes('underveis')) nySeksjon = 'Underveisvurdering';
           else if (keyLower.includes('sluttvurdering') || keyLower.includes('vurdering')) nySeksjon = 'Vurdering';
+
+          if (val && typeof val === 'object' && (val.tittel || val.overskrift)) {
+            const undertittel = hentTekst(val.tittel) || hentTekst(val.overskrift);
+            if (undertittel && !nySeksjon.includes(undertittel)) {
+              nySeksjon = `${nySeksjon} – ${undertittel}`;
+            }
+          }
 
           if (val && typeof val === 'object' && (val.nob || val.nno || val.sme || val.se)) {
             const tekst = hentTekst(val);
@@ -545,11 +557,11 @@
       const s = seksjonTekst.toLowerCase();
 
       if (trinnValg.startsWith('vg')) {
-        return s.includes(trinnValg);
+        return s.includes(trinnValg.toLowerCase());
       }
 
       const t = trinnValg;
-      const regex = new RegExp(`\\b${t}\\.\\s*(trinn|årstrinn)?|etter\\s+${t}\\.`, 'i');
+      const regex = new RegExp(`(\\b|\\D)${t}(\\.|\\s|-|_|aarstrinn|trinn|\"|\\]|$)`, 'i');
       return regex.test(s);
     }
 
