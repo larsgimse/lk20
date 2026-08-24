@@ -12,7 +12,7 @@
     .search-box { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
     .search-box:disabled { background: #f1f5f9; cursor: not-allowed; }
     
-    .checkbox-container { max-height: 250px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; display: none; }
+    .checkbox-container { max-height: 350px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; display: none; }
     .checkbox-container.has-content { display: block; }
     .checkbox-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
     .checkbox-item:hover { background-color: #f1f5f9; }
@@ -131,7 +131,7 @@
 
     function eksaktKode(kode) {
       if (!kode) return "";
-      return kode.split('_')[0]; 
+      return kode.split('_')[0];
     }
 
     function dekodFagnavn(lp) {
@@ -217,7 +217,8 @@
         f.kode.toLowerCase().includes(sok) ||
         f.kode.replace(/[-_]/g, '').toLowerCase().includes(sok)
       );
-      tegnFagliste(filtrert.slice(0, 10));
+      // Ingen begrensning: Viser alle matchende treff
+      tegnFagliste(filtrert);
     }
 
     function oppdaterValgteBadges() {
@@ -335,7 +336,8 @@
             }
 
             const udirUrl = byggUdirUrl(kode);
-            lesObjekt(rawData, "Generelt", reeltNavn, udirUrl, kode);
+            const rotObjekt = rawData.oppbygging || rawData;
+            lesObjekt(rotObjekt, "Om faget", reeltNavn, udirUrl, kode);
           }
         } catch (err) {
           console.error(`Kunne ikke hente ${kode}`, err);
@@ -379,37 +381,37 @@
       if (typeof obj === 'object') {
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
-            const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "";
-            const seksjonNavn = trinnTittel ? `Kompetansemål – ${trinnTittel}` : "Kompetansemål";
-            
+            const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "Kompetansemål";
             if (Array.isArray(sett.kompetansemaal)) {
               sett.kompetansemaal.forEach(km => {
                 const kmTekst = hentTekst(km.tittel) || hentTekst(km.tekst) || hentTekst(km.beskrivelse);
                 if (kmTekst) {
-                  kombinertLaereplanData.push({ fagNavn, seksjon: seksjonNavn, tekst: kmTekst.trim(), url: udirUrl, kode: fagKode });
+                  kombinertLaereplanData.push({ fagNavn, seksjon: `Kompetansemål – ${trinnTittel}`, tekst: kmTekst.trim(), url: udirUrl, kode: fagKode });
                 }
               });
             }
           });
         }
 
-        const t = hentTekst(obj);
-        if (t && (obj.nob || obj.nno || obj.se)) {
-          kombinertLaereplanData.push({ fagNavn, seksjon: naavaerendeSeksjon, tekst: t.trim(), url: udirUrl, kode: fagKode });
-          return;
-        }
-
         for (const [key, val] of Object.entries(obj)) {
           if (key === 'kompetansemaalsett') continue;
 
           let nySeksjon = naavaerendeSeksjon;
-          if (key.includes('kjerneelementer')) nySeksjon = 'Kjerneelement';
-          else if (key.includes('tverrfagligeTemaer')) nySeksjon = 'Tverrfaglig tema';
-          else if (key.includes('grunnleggendeFerdigheter')) nySeksjon = 'Grunnleggende ferdighet';
-          else if (key.includes('omFaget') || key.includes('fagrelevans')) nySeksjon = 'Om faget';
-          else if (key.includes('vurdering')) nySeksjon = 'Vurdering';
+          if (key.includes('fagrelevans')) nySeksjon = 'Fagets relevans og verdier';
+          else if (key.includes('kjerneelementer')) nySeksjon = 'Kjerneelementer';
+          else if (key.includes('tverrfagligeTemaer')) nySeksjon = 'Tverrfaglige temaer';
+          else if (key.includes('grunnleggendeFerdigheter')) nySeksjon = 'Grunnleggende ferdigheter';
+          else if (key.includes('underVurdering') || key.includes('underveisvurdering')) nySeksjon = 'Underveisvurdering';
+          else if (key.includes('sluttvurdering') || key.includes('vurdering')) nySeksjon = 'Vurdering';
 
-          lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode);
+          if (val && typeof val === 'object' && (val.nob || val.nno || val.se)) {
+            const tekst = hentTekst(val);
+            if (tekst && tekst.length > 3) {
+              kombinertLaereplanData.push({ fagNavn, seksjon: nySeksjon, tekst: tekst.trim(), url: udirUrl, kode: fagKode });
+            }
+          } else {
+            lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode);
+          }
         }
       }
     }
