@@ -63,7 +63,7 @@
 
   <div class="card">
     <label>1. Velg en eller flere læreplaner:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Begynn å skrive for å søke fag (f.eks. Norsk, Naturfag)..." oninput="filtrerFagliste()">
+    <input type="text" id="fagFilter" class="search-box" placeholder="Begynn å skrive for å søke fag (f.eks. Norsk, NOR01-08)..." oninput="filtrerFagliste()">
     
     <div class="checkbox-container" id="fagListeContainer"></div>
     <div id="valgteFagBadges" class="selected-badges"></div>
@@ -116,7 +116,8 @@
       "KRLE": "KRLE",
       "KHO": "Kunst og håndverk",
       "MUS": "Musikk",
-      "MHO": "Mat og helse"
+      "MHO": "Mat og helse",
+      "ELR": "Elektro og datakommunikasjon"
     };
 
     function hentTekst(obj) {
@@ -130,26 +131,23 @@
 
     function dekodFagnavn(lp) {
       let navn = hentTekst(lp.tittel) || hentTekst(lp.navn) || hentTekst(lp.overskrift);
+      const renKode = lp.kode.split('_')[0].toUpperCase();
       
       if (!navn || navn === lp.kode || /^[A-Z0-9-]+$/.test(navn)) {
-        const prefiks = lp.kode.split('-')[0].replace(/[0-9]/g, '');
+        const prefiks = renKode.replace(/[^A-Z]/g, '');
         if (FAG_MAPPING[prefiks]) {
-          navn = `${FAG_MAPPING[prefiks]} (${lp.kode})`;
+          navn = `Læreplan i ${FAG_MAPPING[prefiks].toLowerCase()} (${renKode})`;
         } else {
-          navn = lp.kode;
+          navn = renKode;
         }
       } else {
-        navn = `${navn} (${lp.kode})`;
+        navn = `${navn} (${renKode})`;
       }
       return navn;
     }
 
-    // Genererer en fungerende URL til Udir sine nettsider
     function byggUdirUrl(kode, rawData) {
-      if (rawData && rawData.uri && rawData.uri.startsWith("http")) {
-        return rawData.uri;
-      }
-      const renKode = kode.toLowerCase().split('_')[0];
+      const renKode = kode.split('_')[0].toLowerCase();
       return `https://www.udir.no/lk20/${renKode}`;
     }
 
@@ -209,7 +207,11 @@
         tegnFagliste([]);
         return;
       }
-      const filtrert = alleFagListe.filter(f => f.navn.toLowerCase().includes(sok) || f.kode.toLowerCase().includes(sok));
+      const filtrert = alleFagListe.filter(f => 
+        f.navn.toLowerCase().includes(sok) || 
+        f.kode.toLowerCase().includes(sok) ||
+        f.kode.replace('-', '').toLowerCase().includes(sok)
+      );
       tegnFagliste(filtrert.slice(0, 4));
     }
 
@@ -324,7 +326,7 @@
             let reeltNavn = visningsNavn;
             if (rawData.tittel) {
               const funnetTittel = hentTekst(rawData.tittel);
-              if (funnetTittel) reeltNavn = `${funnetTittel} (${kode})`;
+              if (funnetTittel) reeltNavn = `${funnetTittel} (${kode.split('_')[0]})`;
             }
 
             const udirUrl = byggUdirUrl(kode, rawData);
