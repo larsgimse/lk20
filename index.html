@@ -387,6 +387,26 @@
       }
     }
 
+    // Bygger et oppslagskart for ID -> Trinn-tittel
+    function byggTrinnMap(obj, map = new Map()) {
+      if (!obj || typeof obj !== 'object') return map;
+
+      if (obj['@id'] || obj.kode || obj.id) {
+        const id = obj['@id'] || obj.kode || obj.id;
+        const tekst = hentTekst(obj.tittel) || hentTekst(obj.overskrift) || hentTekst(obj.navn) || obj.kode;
+        if (tekst && typeof tekst === 'string') {
+          map.set(id, tekst);
+        }
+      }
+
+      for (const val of Object.values(obj)) {
+        if (typeof val === 'object' && val !== null) {
+          byggTrinnMap(val, map);
+        }
+      }
+      return map;
+    }
+
     async function lastInnDataForKoder(kodeliste, visProgressBar = false) {
       const loadingBox = document.getElementById('loadingInfoBox');
       const progressBar = document.getElementById('progressBar');
@@ -415,8 +435,12 @@
             const rawData = await res.json();
             let reeltNavn = rawData.tittel ? hentVisningsNavn(rawData.tittel, kode) : visningsNavn;
             const udirUrl = byggUdirUrl(kode);
+            
+            // Bygger et oppslagskart over alle definerte trinn i dette faget
+            const trinnMap = byggTrinnMap(rawData);
+
             const rotObjekt = rawData.oppbygging || rawData;
-            lesObjekt(rotObjekt, "Om faget", reeltNavn, udirUrl, kode);
+            lesObjekt(rotObjekt, "Om faget", reeltNavn, udirUrl, kode, trinnMap);
           }
         } catch (err) {
           console.error(`Kunne ikke hente ${kode}`, err);
@@ -440,30 +464,35 @@
       kjoerSoek();
     }
 
-    function henteTrinnTekst(obj) {
-      if (!obj) return "";
-      let funnet = [];
+    function finnTrinnTekstFraSett(sett, trinnMap) {
+      if (!sett) return "";
 
-      if (typeof obj === 'string') return obj;
+      // Check direct title/overskrift first
+      let direkteTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift);
+      if (direkteTittel) return direkteTittel;
 
-      if (Array.isArray(obj)) {
-        return obj.map(henteTrinnTekst).join(" ");
+      // Check references to aarstrinn or trinn
+      let referanser = sett.aarstrinn || sett.trinn || sett['til-aarstrinn'] || [];
+      if (!Array.isArray(referanser)) referanser = [referanser];
+
+      let funnetNavn = [];
+      referanser.forEach(ref => {
+        const refKey = typeof ref === 'object' ? (ref['@id'] || ref.kode || ref.id) : ref;
+        if (trinnMap && trinnMap.has(refKey)) {
+          funnetNavn.push(trinnMap.get(refKey));
+        } else if (typeof refKey === 'string') {
+          funnetNavn.push(refKey);
+        }
+      });
+
+      if (funnetNavn.length > 0) {
+        return funnetNavn.join(", ");
       }
 
-      if (typeof obj === 'object') {
-        if (obj.tittel) funnet.push(hentTekst(obj.tittel));
-        if (obj.overskrift) funnet.push(hentTekst(obj.overskrift));
-        if (obj.kode) funnet.push(obj.kode);
-        if (obj.beskrivelse) funnet.push(hentTekst(obj.beskrivelse));
-        
-        if (obj.trinn) funnet.push(JSON.stringify(obj.trinn));
-        if (obj.aarstrinn) funnet.push(JSON.stringify(obj.aarstrinn));
-      }
-
-      return funnet.join(" ");
+      return "";
     }
 
-    function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode) {
+    function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode, trinnMap) {
       if (!obj) return;
 
       if (typeof obj === 'string') {
@@ -481,16 +510,15 @@
       }
 
       if (Array.isArray(obj)) {
-        obj.forEach(i => lesObjekt(i, naavaerendeSeksjon, fagNavn, udirUrl, fagKode));
+        obj.forEach(i => lesObjekt(i, naavaerendeSeksjon, fagNavn, udirUrl, fagKode, trinnMap));
         return;
       }
 
       if (typeof obj === 'object') {
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
-            const trinnInfo = henteTrinnTekst(sett);
-            const overskrift = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || trinnInfo || "Kompetansemål";
-            const sammensattSeksjon = `Kompetansemål – ${overskrift}`;
+            const trinnNavn = finnTrinnTekstFraSett(sett, trinnMap);
+            const sammensattSeksjon = trinnNavn ? `Kompetansemål – ${trinnNavn}` : "Kompetansemål";
 
             if (Array.isArray(sett.kompetansemaal)) {
               sett.kompetansemaal.forEach(km => {
@@ -543,7 +571,7 @@
               });
             }
           } else {
-            lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode);
+            lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode, trinnMap);
           }
         }
       }
@@ -555,14 +583,17 @@
       if (trinnValg === 'alle') return true;
 
       const s = seksjonTekst.toLowerCase();
+      const tv = trinnValg.toLowerCase();
 
-      if (trinnValg.startsWith('vg')) {
-        return s.includes(trinnValg.toLowerCase());
+      // Vg1, Vg2, Vg3
+      if (tv.startsWith('vg')) {
+        return s.includes(tv);
       }
 
-      const t = trinnValg;
-      const regex = new RegExp(`(\\b|\\D)${t}(\\.|\\s|-|_|aarstrinn|trinn|\"|\\]|$)`, 'i');
-      return regex.test(s);
+      // Tall-trinn (f.eks. 1 til 10)
+      // Treffer "etter 4. trinn", "4-trinn", "trinn 4", "vg4", "aarstrinn_4", etc.
+      const pattern = new RegExp(`(?:\\b|_|\\D)${tv}(?:\\.|\\s|-|_|trinn|aarstrinn|\\b)`, 'i');
+      return pattern.test(s);
     }
 
     function oppdaterFilterAntall(alleTreffForSoek, navaerendeSeksjonValg, navaerendeTrinnValg) {
