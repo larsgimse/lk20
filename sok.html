@@ -16,7 +16,10 @@
     .checkbox-container.has-content { display: block; }
     .checkbox-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
     .checkbox-item:hover { background-color: #f1f5f9; }
+    .checkbox-item.utgaatt { color: #64748b; background-color: #f8fafc; }
     
+    .utgaatt-badge { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 0.7rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; }
+
     .global-toggle { display: flex; align-items: center; gap: 0.5rem; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; font-weight: 600; color: #0369a1; cursor: pointer; }
 
     .loading-info-box { display: none; background: #fffbe0; border: 1px solid #fde047; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
@@ -63,18 +66,18 @@
 
   <div class="card">
     <label>1. Velg en eller flere læreplaner:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Begynn å skrive for å søke fag (f.eks. Norsk, NOR01-08)..." oninput="filtrerFagliste()">
+    <input type="text" id="fagFilter" class="search-box" placeholder="Søk fag eller kode (f.eks. Norsk, NOR01-08)..." oninput="filtrerFagliste()">
     
     <div class="checkbox-container" id="fagListeContainer"></div>
     <div id="valgteFagBadges" class="selected-badges"></div>
 
     <label class="global-toggle">
       <input type="checkbox" id="soekAlleToggle" onchange="haandterGlobalToggle()">
-      <span>Søk på tvers av ALLE læreplaner i LK20 (søk direkte uten å velge fag)</span>
+      <span>Søk på tvers av ALLE læreplaner i LK20</span>
     </label>
 
     <div id="loadingInfoBox" class="loading-info-box">
-      <div class="loading-notice">ℹ️ <strong>Merknad:</strong> Henting av samtlige læreplaner fra Udir tar litt tid. Vennligst vent mens dataene klargjøres...</div>
+      <div class="loading-notice">ℹ️ <strong>Merknad:</strong> Henting av samtlige læreplaner tar litt tid...</div>
       <div class="progress-container">
         <div id="progressBar" class="progress-bar"></div>
         <span id="progressText" class="progress-text">0%</span>
@@ -107,8 +110,8 @@
     let erAlleLadetGlobalt = false;
 
     const FAG_MAPPING = {
-      "SAF": "Samfunnsfag",
       "NOR": "Norsk",
+      "SAF": "Samfunnsfag",
       "NAT": "Naturfag",
       "MAT": "Matematikk",
       "ENG": "Engelsk",
@@ -119,6 +122,10 @@
       "MHO": "Mat og helse",
       "ELR": "Elektro og datakommunikasjon"
     };
+
+    function vaskTekst(str) {
+      return (str || '').toLowerCase().replace(/[-_\s]/g, '');
+    }
 
     function hentTekst(obj) {
       if (!obj) return "";
@@ -134,26 +141,16 @@
       return kode.split('_')[0];
     }
 
-    function dekodFagnavn(lp) {
-      let navn = hentTekst(lp.tittel) || hentTekst(lp.navn) || hentTekst(lp.overskrift);
-      const renKode = eksaktKode(lp.kode);
-      
-      if (!navn || navn === lp.kode || /^[A-Z0-9-]+$/.test(navn)) {
-        const prefiks = renKode.replace(/[^A-Z]/g, '');
-        if (FAG_MAPPING[prefiks]) {
-          navn = `Læreplan i ${FAG_MAPPING[prefiks].toLowerCase()} (${renKode})`;
-        } else {
-          navn = renKode;
-        }
-      } else {
-        navn = `${navn} (${renKode})`;
-      }
-      return navn;
-    }
-
+    // Korrekt Udir URL-struktur for LK20
     function byggUdirUrl(kode) {
       const renKode = eksaktKode(kode).toLowerCase();
       return `https://www.udir.no/lk20/${renKode}`;
+    }
+
+    function sjekkOmUtgaatt(lp) {
+      if (lp.status === 'Utgått' || lp.status === 'UtgittTidligere') return true;
+      if (lp.gyldigTil && new Date(lp.gyldigTil) < new Date()) return true;
+      return false;
     }
 
     async function initFagliste() {
@@ -162,11 +159,34 @@
         if (!res.ok) throw new Error(`HTTP feil: ${res.status}`);
         const data = await res.json();
         
-        alleFagListe = data.map(lp => ({
-          kode: lp.kode,
-          navn: dekodFagnavn(lp),
-          url: lp.url || `${API_BASE}/laereplaner/${lp.kode}`
-        })).sort((a, b) => a.navn.localeCompare(b.navn, 'no'));
+        alleFagListe = data.map(lp => {
+          let tittelNavn = hentTekst(lp.tittel) || hentTekst(lp.navn) || '';
+          const renKode = eksaktKode(lp.kode);
+          const erUtgaatt = sjekkOmUtgaatt(lp);
+
+          if (!tittelNavn || tittelNavn === lp.kode) {
+            const prefiks = renKode.replace(/[^A-Z]/g, '');
+            if (FAG_MAPPING[prefiks]) {
+              tittelNavn = `Læreplan i ${FAG_MAPPING[prefiks].toLowerCase()}`;
+            } else {
+              tittelNavn = renKode;
+            }
+          }
+
+          const visningsNavn = `${tittelNavn} (${renKode})`;
+
+          return {
+            kode: lp.kode,
+            navn: visningsNavn,
+            erUtgaatt: erUtgaatt,
+            sokefelt: `${tittelNavn} norsk ${lp.kode} ${renKode} ${vaskTekst(lp.kode)}`.toLowerCase(),
+            url: lp.url || byggUdirUrl(lp.kode)
+          };
+        }).sort((a, b) => {
+          // Aktive læreplaner først, utgåtte nederst
+          if (a.erUtgaatt !== b.erUtgaatt) return a.erUtgaatt ? 1 : -1;
+          return a.navn.localeCompare(b.navn, 'no');
+        });
 
         document.getElementById('fagStatus').textContent = `Klar! Søk etter og velg fag fra feltet over.`;
       } catch (e) {
@@ -189,7 +209,7 @@
 
       liste.forEach(fag => {
         const label = document.createElement('label');
-        label.className = 'checkbox-item';
+        label.className = `checkbox-item ${fag.erUtgaatt ? 'utgaatt' : ''}`;
         
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -202,22 +222,31 @@
 
         label.appendChild(checkbox);
         label.appendChild(span);
+
+        if (fag.erUtgaatt) {
+          const badge = document.createElement('span');
+          badge.className = 'utgaatt-badge';
+          badge.textContent = 'Utgått';
+          label.appendChild(badge);
+        }
+
         container.appendChild(label);
       });
     }
 
     function filtrerFagliste() {
-      const sok = document.getElementById('fagFilter').value.trim().toLowerCase();
-      if (!sok) {
+      const input = document.getElementById('fagFilter').value.trim().toLowerCase();
+      if (!input) {
         tegnFagliste([]);
         return;
       }
+
+      const vasketSok = vaskTekst(input);
+
       const filtrert = alleFagListe.filter(f => 
-        f.navn.toLowerCase().includes(sok) || 
-        f.kode.toLowerCase().includes(sok) ||
-        f.kode.replace(/[-_]/g, '').toLowerCase().includes(sok)
+        f.sokefelt.includes(input) || f.sokefelt.includes(vasketSok)
       );
-      // Ingen begrensning: Viser alle matchende treff
+
       tegnFagliste(filtrert);
     }
 
@@ -231,7 +260,7 @@
 
         const badge = document.createElement('span');
         badge.className = 'badge-item';
-        badge.innerHTML = `${navn} <span class="badge-remove" onclick="fjernValgtFag('${kode}')">&times;</span>`;
+        badge.innerHTML = `${navn} ${fagObj?.erUtgaatt ? '(Utgått)' : ''} <span class="badge-remove" onclick="fjernValgtFag('${kode}')">&times;</span>`;
         container.appendChild(badge);
       });
     }
