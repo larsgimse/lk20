@@ -24,9 +24,9 @@
 
     .loading-info-box { display: none; background: #fffbe0; border: 1px solid #fde047; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
     .loading-notice { font-size: 0.85rem; color: #854d0e; font-weight: 500; margin-bottom: 0.5rem; }
-    .progress-container { width: 100%; background-color: #e2e8f0; border-radius: 6px; height: 16px; overflow: hidden; position: relative; }
+    .progress-container { width: 100%; background-color: #e2e8f0; border-radius: 6px; height: 18px; overflow: hidden; position: relative; }
     .progress-bar { height: 100%; background-color: #0284c7; width: 0%; transition: width 0.15s ease; }
-    .progress-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 0.75rem; font-weight: 700; color: #1e293b; line-height: 16px; }
+    .progress-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 0.75rem; font-weight: 700; color: #1e293b; line-height: 18px; }
 
     .selected-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
     .badge-item { background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; }
@@ -66,7 +66,7 @@
 
   <div class="card">
     <label>1. Velg en eller flere læreplaner:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Søk fag eller kode (f.eks. Norsk, NOR01-08)..." oninput="filtrerFagliste()">
+    <input type="text" id="fagFilter" class="search-box" placeholder="Søk fag eller kode (f.eks. engelsk, ENG01-04, naturfag)..." oninput="filtrerFagliste()">
     
     <div class="checkbox-container" id="fagListeContainer"></div>
     <div id="valgteFagBadges" class="selected-badges"></div>
@@ -109,22 +109,26 @@
     let sisteTreff = [];
     let erAlleLadetGlobalt = false;
 
-    const FAG_MAPPING = {
-      "NOR": "Norsk",
-      "SAF": "Samfunnsfag",
-      "NAT": "Naturfag",
-      "MAT": "Matematikk",
-      "ENG": "Engelsk",
-      "KRO": "Kroppsøving",
-      "KRLE": "KRLE",
-      "KHO": "Kunst og håndverk",
-      "MUS": "Musikk",
-      "MHO": "Mat og helse",
-      "ELR": "Elektro og datakommunikasjon"
-    };
+    // Dynamisk henting av alle tekstverdier i tittel-objektet uansett språk eller fagsammensetning
+    function hentTittelSokestreng(tittelObj) {
+      if (!tittelObj) return "";
+      if (typeof tittelObj === "string") return tittelObj;
+      if (typeof tittelObj === "object") {
+        return Object.values(tittelObj)
+          .filter(val => typeof val === "string")
+          .join(" ");
+      }
+      return "";
+    }
 
-    function vaskTekst(str) {
-      return (str || '').toLowerCase().replace(/[-_\s]/g, '');
+    function hentVisningsNavn(tittelObj, kode) {
+      if (!tittelObj) return kode;
+      if (typeof tittelObj === "string") return `${tittelObj} (${kode})`;
+      if (typeof tittelObj === "object") {
+        const navn = tittelObj.nob || tittelObj.nno || tittelObj.se || Object.values(tittelObj).find(v => typeof v === "string") || kode;
+        return `${navn} (${kode})`;
+      }
+      return kode;
     }
 
     function hentTekst(obj) {
@@ -136,14 +140,8 @@
       return "";
     }
 
-    function eksaktKode(kode) {
-      if (!kode) return "";
-      return kode.split('_')[0];
-    }
-
-    // Korrekt Udir URL-struktur for LK20
     function byggUdirUrl(kode) {
-      const renKode = eksaktKode(kode).toLowerCase();
+      const renKode = kode.split('_')[0].toLowerCase();
       return `https://www.udir.no/lk20/${renKode}`;
     }
 
@@ -160,30 +158,19 @@
         const data = await res.json();
         
         alleFagListe = data.map(lp => {
-          let tittelNavn = hentTekst(lp.tittel) || hentTekst(lp.navn) || '';
-          const renKode = eksaktKode(lp.kode);
+          const tittelTekst = hentTittelSokestreng(lp.tittel);
+          const visningsNavn = hentVisningsNavn(lp.tittel, lp.kode);
           const erUtgaatt = sjekkOmUtgaatt(lp);
-
-          if (!tittelNavn || tittelNavn === lp.kode) {
-            const prefiks = renKode.replace(/[^A-Z]/g, '');
-            if (FAG_MAPPING[prefiks]) {
-              tittelNavn = `Læreplan i ${FAG_MAPPING[prefiks].toLowerCase()}`;
-            } else {
-              tittelNavn = renKode;
-            }
-          }
-
-          const visningsNavn = `${tittelNavn} (${renKode})`;
 
           return {
             kode: lp.kode,
             navn: visningsNavn,
             erUtgaatt: erUtgaatt,
-            sokefelt: `${tittelNavn} norsk ${lp.kode} ${renKode} ${vaskTekst(lp.kode)}`.toLowerCase(),
+            // Generelt søk som inkluderer alt av tittelinnhold fra JSON pluss koden
+            sokefelt: `${tittelTekst} ${lp.kode}`.toLowerCase(),
             url: lp.url || byggUdirUrl(lp.kode)
           };
         }).sort((a, b) => {
-          // Aktive læreplaner først, utgåtte nederst
           if (a.erUtgaatt !== b.erUtgaatt) return a.erUtgaatt ? 1 : -1;
           return a.navn.localeCompare(b.navn, 'no');
         });
@@ -241,12 +228,7 @@
         return;
       }
 
-      const vasketSok = vaskTekst(input);
-
-      const filtrert = alleFagListe.filter(f => 
-        f.sokefelt.includes(input) || f.sokefelt.includes(vasketSok)
-      );
-
+      const filtrert = alleFagListe.filter(f => f.sokefelt.includes(input));
       tegnFagliste(filtrert);
     }
 
@@ -360,8 +342,7 @@
             
             let reeltNavn = visningsNavn;
             if (rawData.tittel) {
-              const funnetTittel = hentTekst(rawData.tittel);
-              if (funnetTittel) reeltNavn = `${funnetTittel} (${eksaktKode(kode)})`;
+              reeltNavn = hentVisningsNavn(rawData.tittel, kode);
             }
 
             const udirUrl = byggUdirUrl(kode);
