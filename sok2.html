@@ -62,7 +62,6 @@
   <h2>Søk i LK20 Læreplaner</h2>
 
   <div class="card">
-    <!-- 1. Velg fag -->
     <label>1. Velg en eller flere læreplaner:</label>
     <input type="text" id="fagFilter" class="search-box" placeholder="Begynn å skrive for å søke fag (f.eks. Norsk, Naturfag)..." oninput="filtrerFagliste()">
     
@@ -86,7 +85,6 @@
 
     <hr style="margin: 1.25rem 0; border: 0; border-top: 1px solid #e2e8f0;">
 
-    <!-- 2. Søk etter stikkord -->
     <label for="stikkordInput">2. Søk etter stikkord:</label>
     <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn søkeord (f.eks. digital, kildekritikk)..." disabled>
   </div>
@@ -144,6 +142,15 @@
         navn = `${navn} (${lp.kode})`;
       }
       return navn;
+    }
+
+    // Genererer en fungerende URL til Udir sine nettsider
+    function byggUdirUrl(kode, rawData) {
+      if (rawData && rawData.uri && rawData.uri.startsWith("http")) {
+        return rawData.uri;
+      }
+      const renKode = kode.toLowerCase().split('_')[0];
+      return `https://www.udir.no/lk20/${renKode}`;
     }
 
     async function initFagliste() {
@@ -265,7 +272,6 @@
       filterInput.disabled = isGlobal;
 
       if (isGlobal) {
-        // Tømmer alle tidligere valgte fag og nullstiller fag-søket
         valgteKoder.clear();
         filterInput.value = '';
         tegnFagliste([]);
@@ -321,7 +327,7 @@
               if (funnetTittel) reeltNavn = `${funnetTittel} (${kode})`;
             }
 
-            const udirUrl = `https://www.udir.no/lk20/${kode.toLowerCase()}` || rawData.uri || `${API_BASE}/laereplaner/${kode}`;
+            const udirUrl = byggUdirUrl(kode, rawData);
             lesObjekt(rawData, "Generelt", reeltNavn, udirUrl, kode);
           }
         } catch (err) {
