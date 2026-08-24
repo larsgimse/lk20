@@ -440,12 +440,38 @@
       kjoerSoek();
     }
 
+    function henteTrinnTekst(obj) {
+      let funnetTekst = "";
+      if (!obj) return funnetTekst;
+
+      if (typeof obj === 'string') return obj;
+
+      if (Array.isArray(obj)) {
+        return obj.map(henteTrinnTekst).join(" ");
+      }
+
+      if (typeof obj === 'object') {
+        if (obj.tittel) funnetTekst += " " + hentTekst(obj.tittel);
+        if (obj.overskrift) funnetTekst += " " + hentTekst(obj.overskrift);
+        if (obj.kode) funnetTekst += " " + obj.kode;
+        if (obj.trinn) funnetTekst += " " + JSON.stringify(obj.trinn);
+      }
+      return funnetTekst;
+    }
+
     function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode) {
       if (!obj) return;
 
       if (typeof obj === 'string') {
         if (obj.trim().length > 3 && !obj.startsWith('http')) {
-          kombinertLaereplanData.push({ id: Math.random().toString(36).substr(2, 9), fagNavn, seksjon: naavaerendeSeksjon, tekst: obj.trim(), url: udirUrl, kode: fagKode });
+          kombinertLaereplanData.push({ 
+            id: Math.random().toString(36).substr(2, 9), 
+            fagNavn, 
+            seksjon: naavaerendeSeksjon, 
+            tekst: obj.trim(), 
+            url: udirUrl, 
+            kode: fagKode 
+          });
         }
         return;
       }
@@ -458,12 +484,21 @@
       if (typeof obj === 'object') {
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
-            const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "Kompetansemål";
+            const trinnTekst = henteTrinnTekst(sett);
+            const overskrift = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || trinnTekst || "Kompetansemål";
+            
             if (Array.isArray(sett.kompetansemaal)) {
               sett.kompetansemaal.forEach(km => {
                 const kmTekst = hentTekst(km.tittel) || hentTekst(km.tekst) || hentTekst(km.beskrivelse);
                 if (kmTekst) {
-                  kombinertLaereplanData.push({ id: Math.random().toString(36).substr(2, 9), fagNavn, seksjon: `Kompetansemål – ${trinnTittel}`, tekst: kmTekst.trim(), url: udirUrl, kode: fagKode });
+                  kombinertLaereplanData.push({ 
+                    id: Math.random().toString(36).substr(2, 9), 
+                    fagNavn, 
+                    seksjon: `Kompetansemål – ${overskrift}`, 
+                    tekst: kmTekst.trim(), 
+                    url: udirUrl, 
+                    kode: fagKode 
+                  });
                 }
               });
             }
@@ -486,7 +521,14 @@
           if (val && typeof val === 'object' && (val.nob || val.nno || val.sme || val.se)) {
             const tekst = hentTekst(val);
             if (tekst && tekst.length > 3) {
-              kombinertLaereplanData.push({ id: Math.random().toString(36).substr(2, 9), fagNavn, seksjon: nySeksjon, tekst: tekst.trim(), url: udirUrl, kode: fagKode });
+              kombinertLaereplanData.push({ 
+                id: Math.random().toString(36).substr(2, 9), 
+                fagNavn, 
+                seksjon: nySeksjon, 
+                tekst: tekst.trim(), 
+                url: udirUrl, 
+                kode: fagKode 
+              });
             }
           } else {
             lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode);
@@ -500,26 +542,18 @@
     function sjekkTrinnMatch(seksjonTekst, trinnValg) {
       if (trinnValg === 'alle') return true;
 
-      const seksjon = seksjonTekst.toLowerCase();
+      const s = seksjonTekst.toLowerCase();
 
       if (trinnValg.startsWith('vg')) {
-        return seksjon.includes(trinnValg);
+        return s.includes(trinnValg);
       }
 
-      const tall = trinnValg;
-      
-      const harTallOgTrinn = seksjon.includes(`${tall}. trinn`) || 
-                             seksjon.includes(`${tall}.trinn`) || 
-                             seksjon.includes(`${tall}. årstrinn`) ||
-                             seksjon.includes(`${tall}.årstrinn`) ||
-                             seksjon.includes(`etter ${tall}.`);
-
-      return harTallOgTrinn;
+      const t = trinnValg;
+      const regex = new RegExp(`\\b${t}\\.\\s*(trinn|årstrinn)?|etter\\s+${t}\\.`, 'i');
+      return regex.test(s);
     }
 
-    // Oppdaterer antall treff i parentes på nedtrekksmenyene
     function oppdaterFilterAntall(alleTreffForSoek, navaerendeSeksjonValg, navaerendeTrinnValg) {
-      // 1. Oppdater Trinn-filteret
       const trinnSelect = document.getElementById('trinnFilter');
       Array.from(trinnSelect.options).forEach(opt => {
         const baseLabel = opt.getAttribute('data-label') || opt.textContent;
@@ -530,7 +564,6 @@
           return;
         }
 
-        // Beregn antall treff for dette trinnet gitt nåværende seksjonsvalg
         const antall = alleTreffForSoek.filter(item => {
           const seksjonOK = navaerendeSeksjonValg === 'alle' || item.seksjon.toLowerCase().includes(navaerendeSeksjonValg.toLowerCase());
           const trinnOK = sjekkTrinnMatch(item.seksjon, val);
@@ -540,7 +573,6 @@
         opt.textContent = `${baseLabel} (${antall})`;
       });
 
-      // 2. Oppdater Seksjon-filteret
       const seksjonSelect = document.getElementById('seksjonFilter');
       Array.from(seksjonSelect.options).forEach(opt => {
         const baseLabel = opt.getAttribute('data-label') || opt.textContent;
@@ -551,7 +583,6 @@
           return;
         }
 
-        // Beregn antall treff for denne seksjonen gitt nåværende trinnvalg
         const antall = alleTreffForSoek.filter(item => {
           const seksjonOK = val === 'alle' || item.seksjon.toLowerCase().includes(val.toLowerCase());
           const trinnOK = sjekkTrinnMatch(item.seksjon, navaerendeTrinnValg);
@@ -582,7 +613,6 @@
 
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
       
-      // Hent alle treff som matcher stikkordet uavhengig av trinn/seksjon-filtre
       const alleTekstTreff = [];
       const unikeTeksterGlobal = new Set();
 
@@ -597,10 +627,8 @@
         }
       });
 
-      // Oppdater tallene i nedtrekksmenyene
       oppdaterFilterAntall(alleTekstTreff, seksjonValg, trinnValg);
 
-      // Bruk filtre på treffene som skal vises
       sisteTreff = alleTekstTreff.filter(item => {
         if (seksjonValg !== 'alle' && !item.seksjon.toLowerCase().includes(seksjonValg.toLowerCase())) {
           return false;
