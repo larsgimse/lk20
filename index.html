@@ -5,50 +5,62 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LK20 Læreplansøk og Stikkord</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; background: #f8fafc; }
-    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #0f172a; background: #f8fafc; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
     
-    .section-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
+    .section-title { font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
     .section-badge { background: #0284c7; color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; }
 
-    label { display: block; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; color: #1e293b; }
     
-    .search-box { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
+    .search-box { width: 100%; padding: 0.75rem 1rem; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
     .search-box:focus { border-color: #0284c7; outline: none; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
     .search-box:disabled { background: #f1f5f9; cursor: not-allowed; }
     
-    .checkbox-container { max-height: 250px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; background: #fff; margin-bottom: 1rem; display: none; }
-    .checkbox-container.has-content { display: block; }
-    .checkbox-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.95rem; cursor: pointer; }
-    .checkbox-item:hover { background-color: #f1f5f9; }
-    .checkbox-item.utgaatt { color: #64748b; background-color: #f8fafc; }
+    /* Layout for fagliste (matcher skjermbilde) */
+    .fag-liste-wrapper { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; max-height: 400px; overflow-y: auto; margin-top: 0.75rem; display: none; }
+    .fag-liste-wrapper.has-content { display: block; }
     
-    .utgaatt-badge { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-size: 0.7rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; text-transform: uppercase; margin-left: auto; }
+    .fag-rad { display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; border-bottom: 1px solid #f1f5f9; background: #fff; cursor: pointer; transition: background 0.15s ease; }
+    .fag-rad:last-child { border-bottom: none; }
+    .fag-rad:hover { background-color: #f8fafc; }
+    .fag-rad.valgt { background-color: #f0f9ff; }
+    
+    .fag-info { display: flex; align-items: center; gap: 0.75rem; }
+    .fag-titler { display: flex; flex-direction: column; }
+    .fag-overskrift { font-weight: 700; font-size: 1rem; color: #0f172a; line-height: 1.2; }
+    .fag-undertekst { font-size: 0.825rem; color: #64748b; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; margin-top: 2px; }
 
-    .global-toggle { display: flex; align-items: center; gap: 0.5rem; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0.75rem; border-radius: 6px; margin-bottom: 0.75rem; font-weight: 600; color: #0369a1; cursor: pointer; }
+    .fag-meta { display: flex; align-items: center; gap: 0.75rem; }
+    .status-badge { font-size: 0.75rem; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+    .status-badge.aktiv { background: #dcfce7; color: #166534; }
+    .status-badge.utgaatt { background: #fee2e2; color: #991b1b; }
+    
+    .udir-ekstern-lenke { font-size: 0.85rem; color: #2563eb; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
+    .udir-ekstern-lenke:hover { text-decoration: underline; }
 
-    .loading-info-box { display: none; background: #fffbe0; border: 1px solid #fde047; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
+    .global-toggle { display: flex; align-items: center; gap: 0.5rem; background: #f0f9ff; border: 1px solid #bae6fd; padding: 0.75rem 1rem; border-radius: 8px; margin-top: 1rem; font-weight: 600; color: #0369a1; cursor: pointer; }
+
+    .loading-info-box { display: none; background: #fffbe0; border: 1px solid #fde047; padding: 0.75rem; border-radius: 8px; margin-top: 1rem; }
     .loading-notice { font-size: 0.85rem; color: #854d0e; font-weight: 500; margin-bottom: 0.5rem; }
     .progress-container { width: 100%; background-color: #e2e8f0; border-radius: 6px; height: 18px; overflow: hidden; position: relative; }
     .progress-bar { height: 100%; background-color: #0284c7; width: 0%; transition: width 0.15s ease; }
     .progress-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 0.75rem; font-weight: 700; color: #1e293b; line-height: 18px; }
 
-    .selected-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
-    .badge-item { background: #e0f2fe; color: #0369a1; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.3rem; }
+    .selected-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .badge-item { background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
     .badge-remove { cursor: pointer; font-weight: bold; color: #0284c7; }
     .badge-remove:hover { color: #dc2626; }
 
     .controls-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
-    .select-input { width: 100%; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 6px; background: white; font-size: 0.9rem; }
+    .select-input { width: 100%; padding: 0.6rem; border: 1px solid #cbd5e1; border-radius: 8px; background: white; font-size: 0.9rem; }
 
     .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
     .button-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-    .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 6px 6px 0; padding: 1rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); position: relative; }
+    .result-card { background: white; border-left: 4px solid #0284c7; border-radius: 0 8px 8px 0; padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); position: relative; }
     .result-tag { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #0284c7; margin-bottom: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-    .fag-badge { background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; text-transform: none; font-weight: 600; }
-    .udir-link { font-size: 0.85rem; color: #0284c7; text-decoration: none; font-weight: 600; }
-    .udir-link:hover { text-decoration: underline; }
+    .fag-badge { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; text-transform: none; font-weight: 600; }
     .result-actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; }
     .action-btn { background: none; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 6px; font-size: 0.8rem; cursor: pointer; color: #475569; }
     .action-btn:hover { background: #f1f5f9; color: #0f172a; }
@@ -58,7 +70,7 @@
 
     .result-text { font-size: 0.95rem; line-height: 1.5; color: #334155; }
     mark { background: #fef08a; padding: 0 2px; border-radius: 2px; font-weight: 600; }
-    .status { font-size: 0.875rem; color: #0284c7; font-weight: 500; }
+    .status { font-size: 0.9rem; color: #16a34a; font-weight: 600; margin-top: 0.5rem; }
     .error { color: #dc2626; }
 
     .btn { background-color: #0284c7; color: white; border: none; padding: 0.5rem 0.8rem; font-size: 0.85rem; font-weight: 600; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -68,25 +80,23 @@
 
     @media print {
       body { background: white; color: black; max-width: 100%; margin: 0; padding: 0; }
-      .card, .button-group, .action-btn, .udir-link, .global-toggle, #loadingInfoBox { display: none !important; }
+      .card, .button-group, .action-btn, .global-toggle, #loadingInfoBox { display: none !important; }
       .result-card { border-left: 2px solid #000; page-break-inside: avoid; }
     }
   </style>
 </head>
 <body>
 
-  <h2>Søk i LK20 Læreplaner</h2>
+  <h2>Søk i LK20-læreplaner</h2>
 
   <!-- STEG 1: FAGVALG -->
   <div class="card">
-    <div class="section-title">
-      <span class="section-badge">1</span> Velg læreplaner
-    </div>
+    <label for="fagFilter">Søk etter fag eller fagkode:</label>
+    <input type="text" id="fagFilter" class="search-box" placeholder="f.eks. Norsk, Engelsk, NOR01-06..." oninput="filtrerFagliste()">
     
-    <label for="fagFilter">Finn fag eller fagkode:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Søk fag eller kode (f.eks. Norsk, NOR01-06, Engelsk, Matik)..." oninput="filtrerFagliste()">
-    
-    <div class="checkbox-container" id="fagListeContainer"></div>
+    <div id="fagStatus" class="status">Klargjør fagliste...</div>
+
+    <div class="fag-liste-wrapper" id="fagListeContainer"></div>
     <div id="valgteFagBadges" class="selected-badges"></div>
 
     <label class="global-toggle">
@@ -101,8 +111,6 @@
         <span id="progressText" class="progress-text">0%</span>
       </div>
     </div>
-
-    <div id="fagStatus" class="status">Klargjør fagliste...</div>
   </div>
 
   <!-- STEG 2: SØK OG FILTRERING AV TREFF -->
@@ -194,18 +202,6 @@
     let favoritter = new Set();
     let erAlleLadetGlobalt = false;
 
-    function hentTittelSokestreng(tittelObj) {
-      if (!tittelObj) return "";
-      if (typeof tittelObj === "string") return tittelObj;
-      if (typeof tittelObj === "object") {
-        return Object.values(tittelObj)
-          .flatMap(val => (typeof val === "object" && val !== null) ? Object.values(val) : val)
-          .filter(val => typeof val === "string")
-          .join(" ");
-      }
-      return "";
-    }
-
     function hentTekst(obj) {
       if (!obj) return "";
       if (typeof obj === "string") return obj;
@@ -213,11 +209,6 @@
         return obj.nob || obj.nno || obj.sme || obj.se || obj.smj || obj.sma || obj.tittel || Object.values(obj).find(v => typeof v === "string") || "";
       }
       return "";
-    }
-
-    function hentVisningsNavn(tittelObj, kode) {
-      const navn = hentTekst(tittelObj);
-      return navn ? `${navn} (${kode})` : kode;
     }
 
     function byggUdirUrl(kode) {
@@ -238,13 +229,12 @@
         const data = await res.json();
         
         alleFagListe = data.map(lp => {
-          const tittelTekst = hentTittelSokestreng(lp.tittel);
-          const visningsNavn = hentVisningsNavn(lp.tittel, lp.kode);
+          const tittelTekst = hentTekst(lp.tittel) || lp.kode;
           const erUtgaatt = sjekkOmUtgaatt(lp);
 
           return {
             kode: lp.kode,
-            navn: visningsNavn,
+            navn: tittelTekst,
             erUtgaatt: erUtgaatt,
             sokefelt: `${tittelTekst} ${lp.kode} ${lp.kode.replace(/-/g, '')}`.toLowerCase(),
             url: lp.url || byggUdirUrl(lp.kode)
@@ -254,7 +244,7 @@
           return a.navn.localeCompare(b.navn, 'no');
         });
 
-        document.getElementById('fagStatus').textContent = `Klar! Søk etter og velg fag fra feltet over. (${alleFagListe.length} LK20-læreplaner funnet)`;
+        document.getElementById('fagStatus').textContent = `Klar! (${alleFagListe.length} LK20-læreplaner lastet inn)`;
       } catch (e) {
         document.getElementById('fagStatus').className = "status error";
         document.getElementById('fagStatus').textContent = "Feil ved lasting av fag fra Udir API.";
@@ -272,29 +262,40 @@
       container.classList.add('has-content');
 
       liste.forEach(fag => {
-        const label = document.createElement('label');
-        label.className = `checkbox-item ${fag.erUtgaatt ? 'utgaatt' : ''}`;
+        const erValgt = valgteKoder.has(fag.kode);
+        const rad = document.createElement('div');
+        rad.className = `fag-rad ${erValgt ? 'valgt' : ''}`;
         
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.value = fag.kode;
-        checkbox.checked = valgteKoder.has(fag.kode);
-        checkbox.addEventListener('change', (e) => haandterFagValg(e, fag));
+        rad.innerHTML = `
+          <div class="fag-info">
+            <input type="checkbox" ${erValgt ? 'checked' : ''} style="cursor:pointer;" onclick="event.stopPropagation();">
+            <div class="fag-titler">
+              <span class="fag-overskrift">${fag.navn}</span>
+              <span class="fag-undertekst">${fag.kode}</span>
+            </div>
+          </div>
+          <div class="fag-meta">
+            <span class="status-badge ${fag.erUtgaatt ? 'utgaatt' : 'aktiv'}">
+              ${fag.erUtgaatt ? 'Utgått' : 'Aktiv'}
+            </span>
+            <a class="udir-ekstern-lenke" href="${fag.url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">
+              Udir ↗
+            </a>
+          </div>
+        `;
 
-        const span = document.createElement('span');
-        span.textContent = fag.navn;
+        rad.addEventListener('click', (e) => {
+          const chk = rad.querySelector('input[type="checkbox"]');
+          chk.checked = !chk.checked;
+          haandterFagValgVisuell(fag, chk.checked);
+        });
 
-        label.appendChild(checkbox);
-        label.appendChild(span);
+        const chkInput = rad.querySelector('input[type="checkbox"]');
+        chkInput.addEventListener('change', (e) => {
+          haandterFagValgVisuell(fag, e.target.checked);
+        });
 
-        if (fag.erUtgaatt) {
-          const badge = document.createElement('span');
-          badge.className = 'utgaatt-badge';
-          badge.textContent = 'Utgått';
-          label.appendChild(badge);
-        }
-
-        container.appendChild(label);
+        container.appendChild(rad);
       });
     }
 
@@ -309,17 +310,37 @@
       tegnFagliste(filtrert);
     }
 
+    async function haandterFagValgVisuell(fag, checked) {
+      if (document.getElementById('soekAlleToggle').checked) return;
+
+      if (checked) valgteKoder.add(fag.kode);
+      else valgteKoder.delete(fag.kode);
+
+      oppdaterValgteBadges();
+      filtrerFagliste();
+
+      if (valgteKoder.size === 0) {
+        kombinertLaereplanData = [];
+        document.getElementById('stikkordInput').disabled = true;
+        document.getElementById('fagStatus').textContent = `Klar! (${alleFagListe.length} LK20-læreplaner lastet inn)`;
+        kjoerSoek();
+        return;
+      }
+
+      await lastInnDataForKoder(Array.from(valgteKoder));
+    }
+
     function oppdaterValgteBadges() {
       const container = document.getElementById('valgteFagBadges');
       container.innerHTML = '';
 
       valgteKoder.forEach(kode => {
         const fagObj = alleFagListe.find(f => f.kode === kode);
-        const navn = fagObj ? fagObj.navn : kode;
+        const tittel = fagObj ? `${fagObj.navn} (${kode})` : kode;
 
         const badge = document.createElement('span');
         badge.className = 'badge-item';
-        badge.innerHTML = `${navn} ${fagObj?.erUtgaatt ? '(Utgått)' : ''} <span class="badge-remove" onclick="fjernValgtFag('${kode}')">&times;</span>`;
+        badge.innerHTML = `${tittel} <span class="badge-remove" onclick="fjernValgtFag('${kode}')">&times;</span>`;
         container.appendChild(badge);
       });
     }
@@ -332,30 +353,11 @@
       if (valgteKoder.size === 0) {
         kombinertLaereplanData = [];
         document.getElementById('stikkordInput').disabled = true;
-        document.getElementById('fagStatus').textContent = "Ingen fag valgt.";
+        document.getElementById('fagStatus').textContent = `Klar! (${alleFagListe.length} LK20-læreplaner lastet inn)`;
         kjoerSoek();
       } else {
         await lastInnDataForKoder(Array.from(valgteKoder));
       }
-    }
-
-    async function haandterFagValg(e, fag) {
-      if (document.getElementById('soekAlleToggle').checked) return;
-
-      if (e.target.checked) valgteKoder.add(fag.kode);
-      else valgteKoder.delete(fag.kode);
-
-      oppdaterValgteBadges();
-
-      if (valgteKoder.size === 0) {
-        kombinertLaereplanData = [];
-        document.getElementById('stikkordInput').disabled = true;
-        document.getElementById('fagStatus').textContent = "Ingen fag valgt.";
-        kjoerSoek();
-        return;
-      }
-
-      await lastInnDataForKoder(Array.from(valgteKoder));
     }
 
     async function haandterGlobalToggle() {
@@ -382,7 +384,7 @@
         document.getElementById('loadingInfoBox').style.display = 'none';
         kombinertLaereplanData = [];
         document.getElementById('stikkordInput').disabled = true;
-        document.getElementById('fagStatus').textContent = "Ingen fag valgt.";
+        document.getElementById('fagStatus').textContent = `Klar! (${alleFagListe.length} LK20-læreplaner lastet inn)`;
         kjoerSoek();
       }
     }
@@ -408,15 +410,14 @@
       
       for (const kode of kodeliste) {
         const fagObj = alleFagListe.find(f => f.kode === kode);
-        const visningsNavn = fagObj ? fagObj.navn : kode;
+        const visningsNavn = fagObj ? `${fagObj.navn} (${kode})` : kode;
         try {
           const res = await fetch(`${API_BASE}/laereplaner-lk20/${kode}`, { headers: { 'Accept': 'application/json' } });
           if (res.ok) {
             const rawData = await res.json();
-            let reeltNavn = rawData.tittel ? hentVisningsNavn(rawData.tittel, kode) : visningsNavn;
             const udirUrl = byggUdirUrl(kode);
             const rotObjekt = rawData.oppbygging || rawData;
-            lesObjekt(rotObjekt, "Om faget", reeltNavn, udirUrl, kode);
+            lesObjekt(rotObjekt, "Om faget", visningsNavn, udirUrl, kode);
           }
         } catch (err) {
           console.error(`Kunne ikke hente ${kode}`, err);
@@ -434,7 +435,7 @@
         setTimeout(() => { loadingBox.style.display = 'none'; }, 800);
       }
 
-      document.getElementById('fagStatus').textContent = `Klar! Innhold for ${kodeliste.length} læreplan(er) er klart. Skriv inn søkeord i steg 2.`;
+      document.getElementById('fagStatus').textContent = `Innhold for ${kodeliste.length} læreplan(er) er klart. Skriv inn søkeord i steg 2.`;
       document.getElementById('stikkordInput').disabled = false;
       document.getElementById('stikkordInput').focus();
       kjoerSoek();
@@ -534,11 +535,12 @@
 
       const container = document.getElementById('resultatVisning');
       const eksportKnapper = document.getElementById('eksportKnapper');
+      const treffTittel = document.getElementById('treffTittel');
       container.innerHTML = '';
       sisteTreff = [];
 
       if (søketekst.length < 2 || kombinertLaereplanData.length === 0) {
-        document.getElementById('treffTittel').textContent = '';
+        treffTittel.textContent = '';
         eksportKnapper.style.display = 'none';
         return;
       }
@@ -552,7 +554,7 @@
           return;
         }
 
-        // 2. Trinnfiltrering (Sjekker om elementet matcher det valgte trinnet)
+        // 2. Trinnfiltrering
         if (!sjekkTrinnMatch(item, trinnValg)) {
           return;
         }
@@ -568,7 +570,7 @@
         }
       });
 
-      document.getElementById('treffTittel').textContent = `${sisteTreff.length} treff for "${søketekst}"`;
+      treffTittel.textContent = `${sisteTreff.length} treff for "${søketekst}"`;
 
       if (sisteTreff.length === 0) {
         eksportKnapper.style.display = 'none';
@@ -619,7 +621,7 @@
           <div class="result-actions">
             <button class="action-btn fav-btn ${erFav ? 'active' : ''}" onclick="toggleFavoritt('${item.id}')">${erFav ? '⭐ Lagret' : '☆ Husk'}</button>
             <button class="action-btn" onclick="kopierEnkeltTekst(\`${item.tekst.replace(/`/g, '\\`')}\`)">📋 Kopier</button>
-            <a class="udir-link" href="${item.url}" target="_blank" rel="noopener noreferrer">Åpne ↗</a>
+            <a class="udir-ekstern-lenke" href="${item.url}" target="_blank" rel="noopener noreferrer">Åpne ↗</a>
           </div>
         </div>
         <div class="result-text">${visningsTekst}</div>
