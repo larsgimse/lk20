@@ -118,25 +118,25 @@
       <div>
         <label for="trinnFilter">Filtrer på trinn / årstrinn:</label>
         <select id="trinnFilter" class="select-input" onchange="kjoerSoek()">
-          <option value="alle" data-label="Alle trinn / Generelt">Alle trinn / Generelt</option>
+          <option value="alle">Alle trinn / Generelt</option>
           <optgroup label="Barneskole">
-            <option value="1" data-label="1. trinn">1. trinn</option>
-            <option value="2" data-label="2. trinn">2. trinn</option>
-            <option value="3" data-label="3. trinn">3. trinn</option>
-            <option value="4" data-label="4. trinn">4. trinn</option>
-            <option value="5" data-label="5. trinn">5. trinn</option>
-            <option value="6" data-label="6. trinn">6. trinn</option>
-            <option value="7" data-label="7. trinn">7. trinn</option>
+            <option value="1">1. trinn</option>
+            <option value="2">2. trinn</option>
+            <option value="3">3. trinn</option>
+            <option value="4">4. trinn</option>
+            <option value="5">5. trinn</option>
+            <option value="6">6. trinn</option>
+            <option value="7">7. trinn</option>
           </optgroup>
           <optgroup label="Ungdomsskole">
-            <option value="8" data-label="8. trinn">8. trinn</option>
-            <option value="9" data-label="9. trinn">9. trinn</option>
-            <option value="10" data-label="10. trinn">10. trinn</option>
+            <option value="8">8. trinn</option>
+            <option value="9">9. trinn</option>
+            <option value="10">10. trinn</option>
           </optgroup>
           <optgroup label="Videregående">
-            <option value="vg1" data-label="Vg1">Vg1</option>
-            <option value="vg2" data-label="Vg2">Vg2</option>
-            <option value="vg3" data-label="Vg3">Vg3</option>
+            <option value="vg1">Vg1</option>
+            <option value="vg2">Vg2</option>
+            <option value="vg3">Vg3</option>
           </optgroup>
         </select>
       </div>
@@ -144,12 +144,12 @@
       <div>
         <label for="seksjonFilter">Filtrer på seksjon:</label>
         <select id="seksjonFilter" class="select-input" onchange="kjoerSoek()">
-          <option value="alle" data-label="Alle seksjoner">Alle seksjoner</option>
-          <option value="Kompetansemål" data-label="Kompetansemål">Kompetansemål</option>
-          <option value="Kjerneelementer" data-label="Kjerneelementer">Kjerneelementer</option>
-          <option value="relevans" data-label="Fagets relevans og verdier">Fagets relevans og verdier</option>
-          <option value="Grunnleggende" data-label="Grunnleggende ferdigheter">Grunnleggende ferdigheter</option>
-          <option value="Vurdering" data-label="Vurdering">Vurdering</option>
+          <option value="alle">Alle seksjoner</option>
+          <option value="Kompetansemål">Kompetansemål</option>
+          <option value="Kjerneelementer">Kjerneelementer</option>
+          <option value="relevans">Fagets relevans og verdier</option>
+          <option value="Grunnleggende">Grunnleggende ferdigheter</option>
+          <option value="Vurdering">Vurdering</option>
         </select>
       </div>
 
@@ -387,26 +387,6 @@
       }
     }
 
-    // Bygger et oppslagskart for ID -> Trinn-tittel
-    function byggTrinnMap(obj, map = new Map()) {
-      if (!obj || typeof obj !== 'object') return map;
-
-      if (obj['@id'] || obj.kode || obj.id) {
-        const id = obj['@id'] || obj.kode || obj.id;
-        const tekst = hentTekst(obj.tittel) || hentTekst(obj.overskrift) || hentTekst(obj.navn) || obj.kode;
-        if (tekst && typeof tekst === 'string') {
-          map.set(id, tekst);
-        }
-      }
-
-      for (const val of Object.values(obj)) {
-        if (typeof val === 'object' && val !== null) {
-          byggTrinnMap(val, map);
-        }
-      }
-      return map;
-    }
-
     async function lastInnDataForKoder(kodeliste, visProgressBar = false) {
       const loadingBox = document.getElementById('loadingInfoBox');
       const progressBar = document.getElementById('progressBar');
@@ -435,12 +415,8 @@
             const rawData = await res.json();
             let reeltNavn = rawData.tittel ? hentVisningsNavn(rawData.tittel, kode) : visningsNavn;
             const udirUrl = byggUdirUrl(kode);
-            
-            // Bygger et oppslagskart over alle definerte trinn i dette faget
-            const trinnMap = byggTrinnMap(rawData);
-
             const rotObjekt = rawData.oppbygging || rawData;
-            lesObjekt(rotObjekt, "Om faget", reeltNavn, udirUrl, kode, trinnMap);
+            lesObjekt(rotObjekt, "Om faget", reeltNavn, udirUrl, kode);
           }
         } catch (err) {
           console.error(`Kunne ikke hente ${kode}`, err);
@@ -464,74 +440,30 @@
       kjoerSoek();
     }
 
-    function finnTrinnTekstFraSett(sett, trinnMap) {
-      if (!sett) return "";
-
-      // Check direct title/overskrift first
-      let direkteTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift);
-      if (direkteTittel) return direkteTittel;
-
-      // Check references to aarstrinn or trinn
-      let referanser = sett.aarstrinn || sett.trinn || sett['til-aarstrinn'] || [];
-      if (!Array.isArray(referanser)) referanser = [referanser];
-
-      let funnetNavn = [];
-      referanser.forEach(ref => {
-        const refKey = typeof ref === 'object' ? (ref['@id'] || ref.kode || ref.id) : ref;
-        if (trinnMap && trinnMap.has(refKey)) {
-          funnetNavn.push(trinnMap.get(refKey));
-        } else if (typeof refKey === 'string') {
-          funnetNavn.push(refKey);
-        }
-      });
-
-      if (funnetNavn.length > 0) {
-        return funnetNavn.join(", ");
-      }
-
-      return "";
-    }
-
-    function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode, trinnMap) {
+    function lesObjekt(obj, naavaerendeSeksjon, fagNavn, udirUrl, fagKode) {
       if (!obj) return;
 
       if (typeof obj === 'string') {
         if (obj.trim().length > 3 && !obj.startsWith('http')) {
-          kombinertLaereplanData.push({ 
-            id: Math.random().toString(36).substr(2, 9), 
-            fagNavn, 
-            seksjon: naavaerendeSeksjon, 
-            tekst: obj.trim(), 
-            url: udirUrl, 
-            kode: fagKode 
-          });
+          kombinertLaereplanData.push({ id: Math.random().toString(36).substr(2, 9), fagNavn, seksjon: naavaerendeSeksjon, tekst: obj.trim(), url: udirUrl, kode: fagKode });
         }
         return;
       }
 
       if (Array.isArray(obj)) {
-        obj.forEach(i => lesObjekt(i, naavaerendeSeksjon, fagNavn, udirUrl, fagKode, trinnMap));
+        obj.forEach(i => lesObjekt(i, naavaerendeSeksjon, fagNavn, udirUrl, fagKode));
         return;
       }
 
       if (typeof obj === 'object') {
         if (obj.kompetansemaalsett && Array.isArray(obj.kompetansemaalsett)) {
           obj.kompetansemaalsett.forEach(sett => {
-            const trinnNavn = finnTrinnTekstFraSett(sett, trinnMap);
-            const sammensattSeksjon = trinnNavn ? `Kompetansemål – ${trinnNavn}` : "Kompetansemål";
-
+            const trinnTittel = hentTekst(sett.tittel) || hentTekst(sett.overskrift) || "Kompetansemål";
             if (Array.isArray(sett.kompetansemaal)) {
               sett.kompetansemaal.forEach(km => {
                 const kmTekst = hentTekst(km.tittel) || hentTekst(km.tekst) || hentTekst(km.beskrivelse);
                 if (kmTekst) {
-                  kombinertLaereplanData.push({ 
-                    id: Math.random().toString(36).substr(2, 9), 
-                    fagNavn, 
-                    seksjon: sammensattSeksjon, 
-                    tekst: kmTekst.trim(), 
-                    url: udirUrl, 
-                    kode: fagKode 
-                  });
+                  kombinertLaereplanData.push({ id: Math.random().toString(36).substr(2, 9), fagNavn, seksjon: `Kompetansemål – ${trinnTittel}`, tekst: kmTekst.trim(), url: udirUrl, kode: fagKode });
                 }
               });
             }
@@ -551,27 +483,13 @@
           else if (keyLower.includes('underveis')) nySeksjon = 'Underveisvurdering';
           else if (keyLower.includes('sluttvurdering') || keyLower.includes('vurdering')) nySeksjon = 'Vurdering';
 
-          if (val && typeof val === 'object' && (val.tittel || val.overskrift)) {
-            const undertittel = hentTekst(val.tittel) || hentTekst(val.overskrift);
-            if (undertittel && !nySeksjon.includes(undertittel)) {
-              nySeksjon = `${nySeksjon} – ${undertittel}`;
-            }
-          }
-
           if (val && typeof val === 'object' && (val.nob || val.nno || val.sme || val.se)) {
             const tekst = hentTekst(val);
             if (tekst && tekst.length > 3) {
-              kombinertLaereplanData.push({ 
-                id: Math.random().toString(36).substr(2, 9), 
-                fagNavn, 
-                seksjon: nySeksjon, 
-                tekst: tekst.trim(), 
-                url: udirUrl, 
-                kode: fagKode 
-              });
+              kombinertLaereplanData.push({ id: Math.random().toString(36).substr(2, 9), fagNavn, seksjon: nySeksjon, tekst: tekst.trim(), url: udirUrl, kode: fagKode });
             }
           } else {
-            lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode, trinnMap);
+            lesObjekt(val, nySeksjon, fagNavn, udirUrl, fagKode);
           }
         }
       }
@@ -579,61 +497,33 @@
 
     document.getElementById('stikkordInput').addEventListener('input', kjoerSoek);
 
-    function sjekkTrinnMatch(seksjonTekst, trinnValg) {
+    function sjekkTrinnMatch(item, trinnValg) {
       if (trinnValg === 'alle') return true;
 
-      const s = seksjonTekst.toLowerCase();
-      const tv = trinnValg.toLowerCase();
+      const tekstKontekst = `${item.seksjon} ${item.tekst}`.toLowerCase();
+      const seksjonLower = item.seksjon.toLowerCase();
 
-      // Vg1, Vg2, Vg3
-      if (tv.startsWith('vg')) {
-        return s.includes(tv);
+      // Overordnede/generelle seksjoner gjelder for hele faget og skal vises uavhengig av trinn-filter
+      if (!seksjonLower.includes('kompetansemål') && !seksjonLower.includes('trinn')) {
+        return true; 
       }
 
-      // Tall-trinn (f.eks. 1 til 10)
-      // Treffer "etter 4. trinn", "4-trinn", "trinn 4", "vg4", "aarstrinn_4", etc.
-      const pattern = new RegExp(`(?:\\b|_|\\D)${tv}(?:\\.|\\s|-|_|trinn|aarstrinn|\\b)`, 'i');
-      return pattern.test(s);
-    }
+      // Videregående (Vg1, Vg2, Vg3)
+      if (trinnValg.startsWith('vg')) {
+        return tekstKontekst.includes(trinnValg);
+      }
 
-    function oppdaterFilterAntall(alleTreffForSoek, navaerendeSeksjonValg, navaerendeTrinnValg) {
-      const trinnSelect = document.getElementById('trinnFilter');
-      Array.from(trinnSelect.options).forEach(opt => {
-        const baseLabel = opt.getAttribute('data-label') || opt.textContent;
-        const val = opt.value;
+      // Grunnskole (1. - 10. trinn)
+      const tall = trinnValg;
+      const mønstre = [
+        `${tall}. trinn`,
+        `${tall}.trinn`,
+        `${tall}. årstrinn`,
+        `${tall}.årstrinn`,
+        `etter ${tall}.`
+      ];
 
-        if (alleTreffForSoek.length === 0) {
-          opt.textContent = baseLabel;
-          return;
-        }
-
-        const antall = alleTreffForSoek.filter(item => {
-          const seksjonOK = navaerendeSeksjonValg === 'alle' || item.seksjon.toLowerCase().includes(navaerendeSeksjonValg.toLowerCase());
-          const trinnOK = sjekkTrinnMatch(item.seksjon, val);
-          return seksjonOK && trinnOK;
-        }).length;
-
-        opt.textContent = `${baseLabel} (${antall})`;
-      });
-
-      const seksjonSelect = document.getElementById('seksjonFilter');
-      Array.from(seksjonSelect.options).forEach(opt => {
-        const baseLabel = opt.getAttribute('data-label') || opt.textContent;
-        const val = opt.value;
-
-        if (alleTreffForSoek.length === 0) {
-          opt.textContent = baseLabel;
-          return;
-        }
-
-        const antall = alleTreffForSoek.filter(item => {
-          const seksjonOK = val === 'alle' || item.seksjon.toLowerCase().includes(val.toLowerCase());
-          const trinnOK = sjekkTrinnMatch(item.seksjon, navaerendeTrinnValg);
-          return seksjonOK && trinnOK;
-        }).length;
-
-        opt.textContent = `${baseLabel} (${antall})`;
-      });
+      return mønstre.some(mønster => tekstKontekst.includes(mønster));
     }
 
     function kjoerSoek() {
@@ -650,36 +540,32 @@
       if (søketekst.length < 2 || kombinertLaereplanData.length === 0) {
         document.getElementById('treffTittel').textContent = '';
         eksportKnapper.style.display = 'none';
-        oppdaterFilterAntall([], 'alle', 'alle');
         return;
       }
 
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
-      
-      const alleTekstTreff = [];
-      const unikeTeksterGlobal = new Set();
+      const unikeTekster = new Set();
 
       kombinertLaereplanData.forEach(item => {
+        // 1. Seksjonsfiltrering
+        if (seksjonValg !== 'alle' && !item.seksjon.toLowerCase().includes(seksjonValg.toLowerCase())) {
+          return;
+        }
+
+        // 2. Trinnfiltrering (Sjekker om elementet matcher det valgte trinnet)
+        if (!sjekkTrinnMatch(item, trinnValg)) {
+          return;
+        }
+
+        // 3. Tekstsøk
         const t = item.tekst.toLowerCase();
         if (ordListe.some(ord => t.includes(ord))) {
           const unikNøkkel = `${item.fagNavn}:${item.seksjon}:${item.tekst}`;
-          if (!unikeTeksterGlobal.has(unikNøkkel)) {
-            unikeTeksterGlobal.add(unikNøkkel);
-            alleTekstTreff.push(item);
+          if (!unikeTekster.has(unikNøkkel)) {
+            unikeTekster.add(unikNøkkel);
+            sisteTreff.push(item);
           }
         }
-      });
-
-      oppdaterFilterAntall(alleTekstTreff, seksjonValg, trinnValg);
-
-      sisteTreff = alleTekstTreff.filter(item => {
-        if (seksjonValg !== 'alle' && !item.seksjon.toLowerCase().includes(seksjonValg.toLowerCase())) {
-          return false;
-        }
-        if (!sjekkTrinnMatch(item.seksjon, trinnValg)) {
-          return false;
-        }
-        return true;
       });
 
       document.getElementById('treffTittel').textContent = `${sisteTreff.length} treff for "${søketekst}"`;
