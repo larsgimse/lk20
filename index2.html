@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grep Explorer – Alle læreplaner (LK20)</title>
+  <style>
+    :root {
+      --primary: #005a9c;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --text: #212529;
+      --border: #e9ecef;
+      --accent: #e7f3ff;
+      --badge-bg: #d0e7ff;
+      --badge-text: #004085;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--card-bg);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+
+    h1 {
+      margin: 0 0 16px 0;
+      color: var(--primary);
+      font-size: 1.8rem;
+    }
+
+    .search-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"] {
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      font-size: 1rem;
+      flex-grow: 1;
+      min-width: 180px;
+      text-transform: uppercase;
+    }
+
+    button {
+      padding: 8px 16px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #004075;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: var(--accent);
+      padding: 12px 16px;
+      border-radius: 8px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label {
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    select {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #ced4da;
+      background-color: white;
+      font-size: 0.9rem;
+    }
+
+    .metadata {
+      font-size: 0.85rem;
+      color: #6c757d;
+      margin-top: 12px;
+    }
+
+    section {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+
+    h2 {
+      color: var(--primary);
+      font-size: 1.3rem;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 8px;
+      margin-top: 0;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: #fafafa;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .card h3 {
+      margin-top: 0;
+      font-size: 1.05rem;
+      color: var(--primary);
+    }
+
+    .km-item {
+      background: white;
+      border-left: 4px solid var(--primary);
+      padding: 12px;
+      margin-bottom: 12px;
+      border-radius: 0 8px 8px 0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .km-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+
+    .km-code {
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #6c757d;
+    }
+
+    .ke-tag {
+      display: inline-block;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-top: 8px;
+      margin-right: 4px;
+    }
+
+    #loader {
+      text-align: center;
+      padding: 40px;
+      font-size: 1.2rem;
+      color: #6c757d;
+    }
+
+    .error {
+      color: #dc3545;
+      background: #f8d7da;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #f5c6cb;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Grep Læreplansøk (LK20)</h1>
+    
+    <!-- Fagvelger og manuelt søk -->
+    <div class="search-bar">
+      <select id="predefined-fag">
+        <option value="">-- Velg et fag fra listen --</option>
+        <option value="NOR01-06">NOR01-06 (Norsk)</option>
+        <option value="MAT01-05">MAT01-05 (Matematikk)</option>
+        <option value="ENG01-04">ENG01-04 (Engelsk)</option>
+        <option value="NAT01-05">NAT01-05 (Naturfag)</option>
+        <option value="SAF01-04">SAF01-04 (Samfunnsfag)</option>
+        <option value="KRLE1-02">KRLE1-02 (KRLE)</option>
+        <option value="KRO01-05">KRO01-05 (Kroppsøving)</option>
+        <option value="KOF01-02">KOF01-02 (Kunst og håndverk)</option>
+      </select>
+      
+      <input type="text" id="fagkode-input" placeholder="Eller skriv kode (f.eks. MAT01-05)" value="NOR01-06">
+      <button id="search-btn">Hent fag</button>
+    </div>
+
+    <!-- Kontroller for målform og trinn -->
+    <div class="controls">
+      <div class="control-group">
+        <label for="lang-select">Målform:</label>
+        <select id="lang-select">
+          <option value="nob">Bokmål</option>
+          <option value="nno">Nynorsk</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="trinn-filter">Filtrer trinn:</label>
+        <select id="trinn-filter">
+          <option value="alle">Alle trinn / sett</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="metadata" id="plan-meta"></div>
+  </header>
+
+  <div id="loader">Henter data fra Grep-API...</div>
+
+  <div id="content" style="display: none;">
+    <!-- Kjerneelementer -->
+    <section id="kjerneelementer-section">
+      <h2>Kjerneelementer</h2>
+      <div class="grid" id="kjerneelementer-container"></div>
+    </section>
+
+    <!-- Kompetansemålsett -->
+    <section>
+      <h2>Kompetansemål</h2>
+      <div id="kompetansemaal-container"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+  const BASE_API_URL = "https://data.udir.no/kl06/v201906/laereplaner/";
+  let planData = null;
+  let kjerneelementerMap = new Map();
+
+  function getText(textList, lang = 'nob') {
+    if (!textList || textList.length === 0) return '';
+    const item = textList.find(t => t.spraak === lang);
+    if (item) return item.verdi;
+    const fallback = textList.find(t => t.spraak === 'nob') || textList[0];
+    return fallback ? fallback.verdi : '';
+  }
+
+  async function fetchGrepData(kode) {
+    const cleanKode = kode.trim().toUpperCase();
+    if (!cleanKode) return;
+
+    document.getElementById('loader').style.display = 'block';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('loader').innerHTML = `Henter data for <strong>${cleanKode}</strong> fra Grep...`;
+
+    try {
+      const response = await fetch(`${BASE_API_URL}${cleanKode}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Fant ikke læreplanen '${cleanKode}' (Status: ${response.status})`);
+      }
+
+      planData = await response.json();
+      initApp();
+    } catch (err) {
+      document.getElementById('loader').innerHTML = `
+        <div class="error">
+          <strong>Feil ved lasting:</strong> ${err.message}. Sjekk at koden er skrevet riktig.
+        </div>`;
+    }
+  }
+
+  function initApp() {
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+
+    // Tilbakestill kjerneelement-kart
+    kjerneelementerMap.clear();
+    const keList = planData['om-faget']?.kjerneelementer || [];
+    keList.forEach(ke => {
+      if (ke.uri) kjerneelementerMap.set(ke.uri, ke);
+    });
+
+    // Populer trinn-filter dynamisk for det valgte faget
+    const trinnSelect = document.getElementById('trinn-filter');
+    trinnSelect.innerHTML = '<option value="alle">Alle trinn / sett</option>';
+    
+    const kmSettList = planData.kompetansemaalsett || [];
+    kmSettList.forEach((sett, index) => {
+      const option = document.createElement('option');
+      option.value = index;
+      option.textContent = getText(sett.tittel, 'nob');
+      trinnSelect.appendChild(option);
+    });
+
+    render();
+  }
+
+  function render() {
+    if (!planData) return;
+
+    const lang = document.getElementById('lang-select').value;
+    const selectedTrinnIndex = document.getElementById('trinn-filter').value;
+
+    // Meta-informasjon
+    document.getElementById('plan-meta').textContent = 
+      `Fagkode: ${planData.kode} | Tittel: ${getText(planData.tittel, lang)} | Status: ${planData.status} | URI: ${planData.uri}`;
+
+    // Render Kjerneelementer
+    const keContainer = document.getElementById('kjerneelementer-container');
+    const keSection = document.getElementById('kjerneelementer-section');
+    keContainer.innerHTML = '';
+    
+    const keList = planData['om-faget']?.kjerneelementer || [];
+    if (keList.length === 0) {
+      keSection.style.display = 'none';
+    } else {
+      keSection.style.display = 'block';
+      keList.forEach(ke => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <h3>${getText(ke.tittel, lang)}</h3>
+          <p>${getText(ke.beskrivelse, lang)}</p>
+        `;
+        keContainer.appendChild(card);
+      });
+    }
+
+    // Render Kompetansemål
+    const kmContainer = document.getElementById('kompetansemaal-container');
+    kmContainer.innerHTML = '';
+
+    const kmSettList = planData.kompetansemaalsett || [];
+
+    kmSettList.forEach((sett, index) => {
+      if (selectedTrinnIndex !== 'alle' && parseInt(selectedTrinnIndex) !== index) {
+        return;
+      }
+
+      const settBox = document.createElement('div');
+      settBox.style.marginBottom = '24px';
+      
+      const settTittel = document.createElement('h3');
+      settTittel.style.color = 'var(--primary)';
+      settTittel.textContent = getText(sett.tittel, lang);
+      settBox.appendChild(settTittel);
+
+      const maaler = sett.kompetansemaal || [];
+      maaler.forEach(km => {
+        const kmItem = document.createElement('div');
+        kmItem.className = 'km-item';
+
+        // Hent koblingene til kjerneelementer dynamisk
+        let keTagsHTML = '';
+        const relaterteKE = km['tilhoerer-kjerneelementer'] || [];
+        
+        relaterteKE.forEach(keUri => {
+          const keObj = kjerneelementerMap.get(keUri);
+          if (keObj) {
+            keTagsHTML += `<span class="ke-tag">${getText(keObj.tittel, lang)}</span>`;
+          }
+        });
+
+        kmItem.innerHTML = `
+          <div class="km-header">
+            <span class="km-code">${km.kode || 'KM'}</span>
+          </div>
+          <div>${getText(km.tittel || km.beskrivelse, lang)}</div>
+          ${keTagsHTML ? `<div style="margin-top: 4px;">${keTagsHTML}</div>` : ''}
+        `;
+        
+        settBox.appendChild(kmItem);
+      });
+
+      kmContainer.appendChild(settBox);
+    });
+  }
+
+  // Event Listeners
+  document.getElementById('search-btn').addEventListener('click', () => {
+    const inputVal = document.getElementById('fagkode-input').value;
+    fetchGrepData(inputVal);
+  });
+
+  document.getElementById('predefined-fag').addEventListener('change', (e) => {
+    if (e.target.value) {
+      document.getElementById('fagkode-input').value = e.target.value;
+      fetchGrepData(e.target.value);
+    }
+  });
+
+  document.getElementById('fagkode-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      fetchGrepData(e.target.value);
+    }
+  });
+
+  document.getElementById('lang-select').addEventListener('change', render);
+  document.getElementById('trinn-filter').addEventListener('change', render);
+
+  // Start innhenting på standard fag (NOR01-06)
+  fetchGrepData(document.getElementById('fagkode-input').value);
+</script>
+
+</body>
+</html>
