@@ -13,9 +13,13 @@
 
     label { display: block; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.95rem; color: #1e293b; }
     
-    .search-box { width: 100%; padding: 0.75rem 1rem; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
+    .search-box-wrapper { position: relative; display: flex; align-items: center; margin-bottom: 0.5rem; }
+    .search-box { width: 100%; padding: 0.75rem 2.5rem 0.75rem 1rem; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
     .search-box:focus { border-color: #0284c7; outline: none; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
     
+    .clear-btn { position: absolute; right: 10px; background: none; border: none; font-size: 1.2rem; color: #94a3b8; cursor: pointer; display: none; padding: 0 4px; }
+    .clear-btn:hover { color: #0f172a; }
+
     .fag-liste-wrapper { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; max-height: 250px; overflow-y: auto; margin-top: 0.5rem; display: none; }
     .fag-liste-wrapper.has-content { display: block; }
     
@@ -81,7 +85,7 @@
 
   <h2>LK20 Læreplansøk & Utforsker</h2>
 
-  <!-- INDIKATOR FOR LASTING AV ALLE LÆREPLANER -->
+  <!-- INDIKATOR FOR LASTING -->
   <div id="loadingInfoBox" class="loading-info-box">
     <div id="loadingNotice" class="loading-notice">⏳ Laster inn alle LK20-læreplaner i bakgrunnen... Du kan begynne å søke!</div>
     <div class="progress-container">
@@ -97,9 +101,11 @@
     </div>
 
     <label for="fagFilter">Søk etter fag eller fagkode:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="Søk f.eks. Norsk, Engelsk, NOR01-06..." oninput="filtrerFagliste()">
+    <div class="search-box-wrapper">
+      <input type="text" id="fagFilter" class="search-box" placeholder="Søk f.eks. Norsk, Engelsk, NOR01-06..." oninput="filtrerFagliste()">
+      <button id="clearFagFilter" class="clear-btn" onclick="nullstillFagSoek()" title="Tøm søkefelt">&times;</button>
+    </div>
 
-    <!-- KNAPPER FOR RASK FAGMARKERING -->
     <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
       <button class="btn btn-outline" onclick="velgAlleFag()">📚 Velg alle fag</button>
       <button class="btn btn-secondary" onclick="toemAlleValgteFag()">🗑️ Tøm alle valgte</button>
@@ -107,7 +113,6 @@
 
     <div class="fag-liste-wrapper" id="fagListeContainer"></div>
 
-    <!-- SEKSJON SOM VISER DINE VALGTE FAG -->
     <div class="valgte-fag-seksjon">
       <label>Dine valgte fag (<span id="antallValgteFag">0</span>):</label>
       <div id="valgteFagBadges" class="selected-badges">
@@ -116,14 +121,17 @@
     </div>
   </div>
 
-  <!-- STEG 2: SØK OG FINN-FILTRERING -->
+  <!-- STEG 2: SØK OG FILTRERING -->
   <div class="card">
     <div class="section-title">
       <span class="section-badge">2</span> Søk og filtrer på stikkord
     </div>
 
     <label for="stikkordInput">Skriv inn søkeord:</label>
-    <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn stikkord (f.eks. digital, kildekritikk, programmering)..." oninput="kjoerSoek()">
+    <div class="search-box-wrapper">
+      <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn stikkord (f.eks. digital, kildekritikk, programmering)..." oninput="kjoerSoek()">
+      <button id="clearStikkord" class="clear-btn" onclick="nullstillStikkordSoek()" title="Tøm søkefelt">&times;</button>
+    </div>
 
     <div class="filter-grid">
       <div>
@@ -139,12 +147,12 @@
       </div>
 
       <div>
-        <label>Trinn / Årstrinn:</label>
+        <label>Trinn (gjelder Kompetansemål og Vurdering):</label>
         <div class="checkbox-group">
-          <label class="checkbox-item"><input type="checkbox" value="1" class="trinn-chk" checked onchange="kjoerSoek()"> 1.–2. trinn</label>
-          <label class="checkbox-item"><input type="checkbox" value="3" class="trinn-chk" checked onchange="kjoerSoek()"> 3.–4. trinn</label>
-          <label class="checkbox-item"><input type="checkbox" value="5" class="trinn-chk" checked onchange="kjoerSoek()"> 5.–7. trinn</label>
-          <label class="checkbox-item"><input type="checkbox" value="8" class="trinn-chk" checked onchange="kjoerSoek()"> 8.–10. trinn</label>
+          <label class="checkbox-item"><input type="checkbox" value="1,2" class="trinn-chk" checked onchange="kjoerSoek()"> 1.–2. trinn</label>
+          <label class="checkbox-item"><input type="checkbox" value="3,4" class="trinn-chk" checked onchange="kjoerSoek()"> 3.–4. trinn</label>
+          <label class="checkbox-item"><input type="checkbox" value="5,6,7" class="trinn-chk" checked onchange="kjoerSoek()"> 5.–7. trinn</label>
+          <label class="checkbox-item"><input type="checkbox" value="8,9,10" class="trinn-chk" checked onchange="kjoerSoek()"> 8.–10. trinn</label>
           <label class="checkbox-item"><input type="checkbox" value="vg1" class="trinn-chk" checked onchange="kjoerSoek()"> Vg1</label>
           <label class="checkbox-item"><input type="checkbox" value="vg2" class="trinn-chk" checked onchange="kjoerSoek()"> Vg2</label>
           <label class="checkbox-item"><input type="checkbox" value="vg3" class="trinn-chk" checked onchange="kjoerSoek()"> Vg3</label>
@@ -176,7 +184,7 @@
 
   <div id="resultatVisning"></div>
 
-  <!-- FAVORITTER / HUSKELISTE -->
+  <!-- FAVORITTER -->
   <div id="favorittSeksjon" class="card" style="display: none; margin-top: 2rem; border-color: #fde047; background: #fefce8;">
     <div class="result-header">
       <h3 style="margin: 0; color: #854d0e;">⭐ Husk / Utvalgte mål (<span id="favAntall">0</span>)</h3>
@@ -356,7 +364,12 @@
     }
 
     function filtrerFagliste() {
-      const input = document.getElementById('fagFilter').value.trim().toLowerCase();
+      const inputEl = document.getElementById('fagFilter');
+      const clearBtn = document.getElementById('clearFagFilter');
+      const input = inputEl.value.trim().toLowerCase();
+      
+      clearBtn.style.display = inputEl.value.length > 0 ? 'block' : 'none';
+
       if (!input) {
         tegnFagliste([]);
         return;
@@ -366,9 +379,25 @@
       tegnFagliste(filtrert);
     }
 
+    function nullstillFagSoek() {
+      const inputEl = document.getElementById('fagFilter');
+      inputEl.value = '';
+      filtrerFagliste();
+      inputEl.focus();
+    }
+
+    function nullstillStikkordSoek() {
+      const inputEl = document.getElementById('stikkordInput');
+      inputEl.value = '';
+      document.getElementById('clearStikkord').style.display = 'none';
+      kjoerSoek();
+      inputEl.focus();
+    }
+
     function velgAlleFag() {
       alleFagListe.forEach(f => valgteKoder.add(f.kode));
       document.getElementById('fagFilter').value = '';
+      document.getElementById('clearFagFilter').style.display = 'none';
       tegnFagliste([]);
       oppdaterValgteBadges();
       kjoerSoek();
@@ -377,6 +406,7 @@
     function toemAlleValgteFag() {
       valgteKoder.clear();
       document.getElementById('fagFilter').value = '';
+      document.getElementById('clearFagFilter').style.display = 'none';
       tegnFagliste([]);
       oppdaterValgteBadges();
       kjoerSoek();
@@ -390,6 +420,7 @@
       }
 
       document.getElementById('fagFilter').value = '';
+      document.getElementById('clearFagFilter').style.display = 'none';
       tegnFagliste([]);
       oppdaterValgteBadges();
       kjoerSoek();
@@ -429,8 +460,25 @@
       kjoerSoek();
     }
 
+    function sjekkTrinnMatch(itemTekstOgSeksjon, valgteTrinnVerdier) {
+      const s = itemTekstOgSeksjon.toLowerCase();
+      return valgteTrinnVerdier.some(val => {
+        const trinnListe = val.split(',');
+        return trinnListe.some(t => {
+          const tTrim = t.trim();
+          if (tTrim.startsWith('vg')) {
+            return s.includes(tTrim);
+          }
+          return new RegExp(`\\b${tTrim}\\b`).test(s) || s.includes(`${tTrim}. trinn`);
+        });
+      });
+    }
+
     function kjoerSoek() {
-      const søketekst = document.getElementById('stikkordInput').value.trim();
+      const stikkordInputEl = document.getElementById('stikkordInput');
+      const søketekst = stikkordInputEl.value.trim();
+      document.getElementById('clearStikkord').style.display = stikkordInputEl.value.length > 0 ? 'block' : 'none';
+
       const grupperingValg = document.getElementById('grupperingValg').value;
       const container = document.getElementById('resultatVisning');
       const eksportKnapper = document.getElementById('eksportKnapper');
@@ -446,7 +494,7 @@
       }
 
       const valgteSeksjoner = Array.from(document.querySelectorAll('.seksjon-chk:checked')).map(c => c.value.toLowerCase());
-      const valgteTrinn = Array.from(document.querySelectorAll('.trinn-chk:checked')).map(c => c.value.toLowerCase());
+      const valgteTrinnVerdier = Array.from(document.querySelectorAll('.trinn-chk:checked')).map(c => c.value);
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
 
       sisteTreff = kombinertLaereplanData.filter(item => {
@@ -455,9 +503,10 @@
         const itemSeksjon = item.seksjon.toLowerCase();
         if (valgteSeksjoner.length > 0 && !valgteSeksjoner.some(s => itemSeksjon.includes(s))) return false;
 
-        if (valgteTrinn.length > 0 && itemSeksjon.includes('kompetansemål')) {
-          const macherTrinn = valgteTrinn.some(t => itemSeksjon.includes(t) || item.tekst.toLowerCase().includes(t));
-          if (!macherTrinn) return false;
+        // Trinn-filtrering på Kompetansemål og Vurdering
+        if (valgteTrinnVerdier.length > 0 && (itemSeksjon.includes('kompetansemål') || itemSeksjon.includes('vurdering'))) {
+          const matcherTrinn = sjekkTrinnMatch(`${item.seksjon} ${item.tekst}`, valgteTrinnVerdier);
+          if (!matcherTrinn) return false;
         }
 
         if (ordListe.length > 0) {
