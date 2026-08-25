@@ -15,9 +15,8 @@
     
     .search-box { width: 100%; padding: 0.75rem 1rem; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; margin-bottom: 0.5rem; }
     .search-box:focus { border-color: #0284c7; outline: none; box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
-    .search-box:disabled { background: #f1f5f9; cursor: not-allowed; }
     
-    .fag-liste-wrapper { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; max-height: 300px; overflow-y: auto; margin-top: 0.75rem; display: none; }
+    .fag-liste-wrapper { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; max-height: 250px; overflow-y: auto; margin-top: 0.5rem; display: none; }
     .fag-liste-wrapper.has-content { display: block; }
     
     .fag-rad { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; background: #fff; cursor: pointer; }
@@ -36,10 +35,11 @@
     .progress-bar { height: 100%; background-color: #0284c7; width: 0%; transition: width 0.15s ease; }
     .progress-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; font-size: 0.75rem; font-weight: 700; color: #1e293b; line-height: 18px; }
 
-    .selected-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-    .badge-item { background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
-    .badge-remove { cursor: pointer; font-weight: bold; color: #0284c7; }
-    .badge-remove:hover { color: #dc2626; }
+    .valgte-fag-seksjon { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1; }
+    .selected-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; max-height: 150px; overflow-y: auto; }
+    .badge-item { background: #0284c7; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .badge-remove { cursor: pointer; font-weight: bold; background: rgba(255,255,255,0.2); border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; }
+    .badge-remove:hover { background: #dc2626; color: white; }
 
     .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; background: #f1f5f9; padding: 1rem; border-radius: 8px; }
     .checkbox-group { display: flex; flex-direction: column; gap: 0.4rem; max-height: 180px; overflow-y: auto; padding-right: 0.5rem; }
@@ -67,6 +67,10 @@
     .btn:hover { background-color: #0369a1; }
     .btn-secondary { background-color: #64748b; }
     .btn-secondary:hover { background-color: #475569; }
+    .btn-outline { background-color: transparent; color: #0284c7; border: 1px solid #0284c7; }
+    .btn-outline:hover { background-color: #f0f9ff; }
+    .btn-danger { background-color: #ef4444; color: white; }
+    .btn-danger:hover { background-color: #dc2626; }
 
     @media print {
       body { background: white; color: black; max-width: 100%; margin: 0; padding: 0; }
@@ -81,7 +85,7 @@
 
   <!-- INDIKATOR FOR LASTING AV ALLE LÆREPLANER -->
   <div id="loadingInfoBox" class="loading-info-box">
-    <div id="loadingNotice" class="loading-notice">⏳ Laster inn alle LK20-læreplaner... Vennligst vent.</div>
+    <div id="loadingNotice" class="loading-notice">⏳ Laster inn alle LK20-læreplaner i bakgrunnen... Du kan begynne å søke!</div>
     <div class="progress-container">
       <div id="progressBar" class="progress-bar"></div>
       <span id="progressText" class="progress-text">0%</span>
@@ -91,14 +95,27 @@
   <!-- STEG 1: FAGVALG -->
   <div class="card">
     <div class="section-title">
-      <span class="section-badge">1</span> Velg fag (Søk/kombiner eller velg alle)
+      <span class="section-badge">1</span> Velg et eller flere fag
     </div>
 
     <label for="fagFilter">Søk etter fag eller fagkode:</label>
-    <input type="text" id="fagFilter" class="search-box" placeholder="f.eks. Norsk, Engelsk, NOR01-06..." oninput="filtrerFagliste()">
+    <input type="text" id="fagFilter" class="search-box" placeholder="Søk f.eks. Norsk, Engelsk, NOR01-06..." oninput="filtrerFagliste()">
+
+    <!-- KNAPPER FOR RASK FAGMARKERING -->
+    <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+      <button class="btn btn-outline" onclick="velgAlleFag()">📚 Velg alle fag</button>
+      <button class="btn btn-secondary" onclick="toemAlleValgteFag()">🗑️ Tøm alle valgte</button>
+    </div>
 
     <div class="fag-liste-wrapper" id="fagListeContainer"></div>
-    <div id="valgteFagBadges" class="selected-badges"></div>
+
+    <!-- SEKSJON SOM VISER DINE VALGTE FAG -->
+    <div class="valgte-fag-seksjon">
+      <label>Dine valgte fag (<span id="antallValgteFag">0</span>):</label>
+      <div id="valgteFagBadges" class="selected-badges">
+        <span style="font-size: 0.85rem; color: #64748b; font-style: italic;" id="ingenValgtTekst">Ingen fag er spesifikt valgt (søket gjelder automatisk alle fag).</span>
+      </div>
+    </div>
   </div>
 
   <!-- STEG 2: SØK OG FINN-FILTRERING -->
@@ -110,7 +127,6 @@
     <label for="stikkordInput">Skriv inn søkeord:</label>
     <input type="text" id="stikkordInput" class="search-box" placeholder="Skriv inn stikkord (f.eks. digital, kildekritikk, programmering)..." oninput="kjoerSoek()">
 
-    <!-- FINN.NO TYPE FILTRERING -->
     <div class="filter-grid">
       <div>
         <label>Seksjoner i læreplanen:</label>
@@ -345,18 +361,46 @@
       tegnFagliste(filtrert);
     }
 
+    function velgAlleFag() {
+      alleFagListe.forEach(f => valgteKoder.add(f.kode));
+      document.getElementById('fagFilter').value = '';
+      tegnFagliste([]);
+      oppdaterValgteBadges();
+      kjoerSoek();
+    }
+
+    function toemAlleValgteFag() {
+      valgteKoder.clear();
+      document.getElementById('fagFilter').value = '';
+      tegnFagliste([]);
+      oppdaterValgteBadges();
+      kjoerSoek();
+    }
+
     function haandterFagValg(fag, checked) {
-      if (checked) valgteKoder.add(fag.kode);
-      else valgteKoder.delete(fag.kode);
+      if (checked) {
+        valgteKoder.add(fag.kode);
+        document.getElementById('fagFilter').value = '';
+        tegnFagliste([]);
+      } else {
+        valgteKoder.delete(fag.kode);
+      }
 
       oppdaterValgteBadges();
-      filtrerFagliste();
       kjoerSoek();
     }
 
     function oppdaterValgteBadges() {
       const container = document.getElementById('valgteFagBadges');
+      const antallSpan = document.getElementById('antallValgteFag');
       container.innerHTML = '';
+      
+      antallSpan.textContent = valgteKoder.size;
+
+      if (valgteKoder.size === 0) {
+        container.innerHTML = `<span style="font-size: 0.85rem; color: #64748b; font-style: italic;">Ingen fag er spesifikt valgt (søket gjelder automatisk alle fag).</span>`;
+        return;
+      }
 
       valgteKoder.forEach(kode => {
         const fagObj = alleFagListe.find(f => f.kode === kode);
@@ -372,7 +416,11 @@
     function fjernValgtFag(kode) {
       valgteKoder.delete(kode);
       oppdaterValgteBadges();
-      filtrerFagliste();
+      
+      if (document.getElementById('fagFilter').value.trim()) {
+        filtrerFagliste();
+      }
+      
       kjoerSoek();
     }
 
@@ -392,27 +440,21 @@
         return;
       }
 
-      // Hent checked checkboxes for seksjoner og trinn
       const valgteSeksjoner = Array.from(document.querySelectorAll('.seksjon-chk:checked')).map(c => c.value.toLowerCase());
       const valgteTrinn = Array.from(document.querySelectorAll('.trinn-chk:checked')).map(c => c.value.toLowerCase());
-
       const ordListe = søketekst.toLowerCase().split(/[\s,]+/).filter(w => w.length > 0);
 
       sisteTreff = kombinertLaereplanData.filter(item => {
-        // Filtrer på fag dersom noen er valgt
         if (valgteKoder.size > 0 && !valgteKoder.has(item.kode)) return false;
 
-        // Filtrer på seksjon
         const itemSeksjon = item.seksjon.toLowerCase();
         if (valgteSeksjoner.length > 0 && !valgteSeksjoner.some(s => itemSeksjon.includes(s))) return false;
 
-        // Filtrer på trinn (om det gjelder kompetansemål)
         if (valgteTrinn.length > 0 && itemSeksjon.includes('kompetansemål')) {
           const macherTrinn = valgteTrinn.some(t => itemSeksjon.includes(t) || item.tekst.toLowerCase().includes(t));
           if (!macherTrinn) return false;
         }
 
-        // Søkeord-match
         if (ordListe.length > 0) {
           const t = item.tekst.toLowerCase();
           return ordListe.some(ord => t.includes(ord));
