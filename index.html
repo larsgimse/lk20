@@ -69,8 +69,6 @@
     .btn-secondary:hover { background-color: #475569; }
     .btn-outline { background-color: transparent; color: #0284c7; border: 1px solid #0284c7; }
     .btn-outline:hover { background-color: #f0f9ff; }
-    .btn-danger { background-color: #ef4444; color: white; }
-    .btn-danger:hover { background-color: #dc2626; }
 
     @media print {
       body { background: white; color: black; max-width: 100%; margin: 0; padding: 0; }
@@ -332,7 +330,7 @@
         
         rad.innerHTML = `
           <div class="fag-info">
-            <input type="checkbox" ${erValgt ? 'checked' : ''} style="cursor:pointer;" onclick="event.stopPropagation();">
+            <input type="checkbox" ${erValgt ? 'checked' : ''} style="cursor:pointer;">
             <div class="fag-titler">
               <span class="fag-overskrift">${fag.navn}</span>
               <span class="fag-undertekst">${fag.kode}</span>
@@ -340,10 +338,17 @@
           </div>
         `;
 
-        rad.addEventListener('click', () => {
-          const chk = rad.querySelector('input[type="checkbox"]');
-          chk.checked = !chk.checked;
-          haandterFagValg(fag, chk.checked);
+        const chk = rad.querySelector('input[type="checkbox"]');
+
+        chk.addEventListener('change', (e) => {
+          haandterFagValg(fag, e.target.checked);
+        });
+
+        rad.addEventListener('click', (e) => {
+          if (e.target !== chk) {
+            chk.checked = !chk.checked;
+            haandterFagValg(fag, chk.checked);
+          }
         });
 
         container.appendChild(rad);
@@ -380,12 +385,12 @@
     function haandterFagValg(fag, checked) {
       if (checked) {
         valgteKoder.add(fag.kode);
-        document.getElementById('fagFilter').value = '';
-        tegnFagliste([]);
       } else {
         valgteKoder.delete(fag.kode);
       }
 
+      document.getElementById('fagFilter').value = '';
+      tegnFagliste([]);
       oppdaterValgteBadges();
       kjoerSoek();
     }
